@@ -1,0 +1,56 @@
+{
+  "data": {
+    "project_name": "Synthetic UP Audit Project",
+    "project_code": "SAMPLE-PROJECT",
+    "project_tags": [
+      {
+        "id": 1,
+        "tag": "ac_name",
+        "placeholder": "AC Name",
+        "desposition_type": "multi_level_dropdown",
+        "desposition": "{\"question\":{\"has_question\":true,\"question_text\":\"\",\"ques_validation\":false,\"ans_validation\":true,\"ques_validation_type\":\"mld\",\"ans_validation_type\":\"mld\"},\"primary_breakdown\":{\"quesVal\":[],\"ansVal\":[{\"id\":1001,\"text\":\"Asked Right\",\"comments\":false,\"sublist\":[]},{\"id\":1002,\"text\":\"Mismatch\",\"comments\":true,\"sublist\":[]},{\"id\":1003,\"text\":\"Not Audible - No response\",\"comments\":false,\"sublist\":[]},{\"id\":1004,\"text\":\"Not Audible - Agent did not ask the question\",\"comments\":false,\"sublist\":[]}]}}",
+        "project_code": "SAMPLE-PROJECT",
+        "question_tag_id": 1068,
+        "is_active": true,
+        "order": 1,
+        "tag_type": "console"
+      },
+      {
+        "id": 2,
+        "tag": "state_govt_change",
+        "placeholder": "State Govt Change",
+        "desposition_type": "multi_level_dropdown",
+        "desposition": "{\"question\":{\"has_question\":true,\"question_text\":\"\",\"ques_validation\":true,\"ans_validation\":true,\"ques_validation_type\":\"mld\",\"ans_validation_type\":\"mld\"},\"primary_breakdown\":{\"quesVal\":[{\"id\":2001,\"text\":\"Asked Right\",\"comments\":false,\"sublist\":[]},{\"id\":2002,\"text\":\"Partially Question Asked\",\"comments\":false,\"sublist\":[]}],\"ansVal\":[{\"id\":2100,\"text\":\"Respondent answer without Prompting\",\"comments\":false,\"sublist\":[{\"id\":2101,\"text\":\"Yes - No Prompting Done\",\"comments\":false,\"sublist\":[]},{\"id\":2102,\"text\":\"Respondent says Option A\",\"comments\":false,\"sublist\":[]},{\"id\":2103,\"text\":\"Respondent says Option B\",\"comments\":false,\"sublist\":[]}]},{\"id\":2200,\"text\":\"Respondent answer after Prompting\",\"comments\":false,\"sublist\":[{\"id\":2201,\"text\":\"Prompting - Option A\",\"comments\":false,\"sublist\":[]},{\"id\":2202,\"text\":\"Prompting - Option B\",\"comments\":false,\"sublist\":[]}]},{\"id\":2300,\"text\":\"Mismatch\",\"comments\":true,\"sublist\":[]}]}}",
+        "project_code": "SAMPLE-PROJECT",
+        "question_tag_id": 1128,
+        "is_active": true,
+        "order": 2,
+        "tag_type": "console"
+      },
+      {
+        "id": 3,
+        "tag": "group_interview",
+        "placeholder": "Group Interview",
+        "desposition_type": "multi_level_dropdown",
+        "desposition": "{\"question\":{\"has_question\":false,\"question_text\":\"\",\"ques_validation\":false,\"ans_validation\":true,\"ques_validation_type\":\"mld\",\"ans_validation_type\":\"mld\"},\"primary_breakdown\":{\"quesVal\":[],\"ansVal\":[{\"id\":3001,\"text\":\"Multiple speakers detected\",\"comments\":false,\"sublist\":[]},{\"id\":3002,\"text\":\"All Ok\",\"comments\":false,\"sublist\":[]}]}}",
+        "project_code": "SAMPLE-PROJECT",
+        "question_tag_id": 1076,
+        "is_active": true,
+        "order": 3,
+        "tag_type": "local"
+      },
+      {
+        "id": 4,
+        "tag": "inactive_example",
+        "placeholder": "Inactive Example",
+        "desposition_type": "no_validation",
+        "desposition": "{\"question\":{\"has_question\":false,\"question_text\":\"\"},\"primary_breakdown\":[]}",
+        "project_code": "SAMPLE-PROJECT",
+        "question_tag_id": 9999,
+        "is_active": false,
+        "order": 4,
+        "tag_type": "console"
+      }
+    ]
+  }
+}

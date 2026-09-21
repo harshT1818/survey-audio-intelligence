@@ -1,0 +1,21 @@
+{
+  "response_id": "sample-001",
+  "project_code": "SAMPLE-PROJECT",
+  "language": "hi",
+  "audio_source": "samples/example.mp3",
+  "questions": [
+    {
+      "key": "ac_name",
+      "text_hi": "विधानसभा चुने",
+      "type": "single_choice",
+      "options": [
+        "बिजनौर",
+        "ठाकुरद्वारा",
+        "मिलक"
+      ],
+      "selected_answer": "बिजनौर",
+      "start_ms": null,
+      "end_ms": null
+    }
+  ]
+}

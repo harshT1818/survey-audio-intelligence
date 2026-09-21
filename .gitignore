@@ -1,0 +1,38 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Environment / secrets
+.env
+*.key
+*.pem
+
+# IDE
+.vscode/
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Real survey audio
+*.mp3
+*.wav
+*.aac
+*.m4a
+*.flac
+
+# Runtime/generated data
+outputs/
+temp/
+downloads/
+
+# Never commit real company/project data
+data/
+configs/private/
+samples/private/
+
+# OS
+.DS_Store
+Thumbs.db
