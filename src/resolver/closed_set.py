@@ -10,8 +10,44 @@ from src.resolver.models import (
 )
 
 
+UNCERTAINTY_MARKERS = [
+    "पता नहीं",
+    "पता नही",
+    "नहीं पता",
+    "नही पता",
+    "मालूम नहीं",
+    "मालूम नही",
+    "नहीं मालूम",
+    "नही मालूम",
+    "पता नहीं है",
+    "मालूम नहीं है",
+    "मुझे पता नहीं",
+    "मुझे मालूम नहीं",
+    "कह नहीं सकता",
+    "कह नही सकता",
+    "बता नहीं सकता",
+    "बता नही सकता",
+    "सोचा नहीं",
+    "सोचा नही",
+    "याद नहीं",
+    "याद नही",
+    "don't know",
+    "dont know",
+    "do not know",
+    "not sure",
+    "no idea",
+    "cannot say",
+    "can't say",
+    "cant say",
+]
+
+
 def _normalize(text: str) -> str:
-    text = unicodedata.normalize("NFKC", text)
+    text = unicodedata.normalize(
+        "NFKC",
+        text,
+    )
+
     text = text.lower().strip()
 
     text = re.sub(
@@ -20,13 +56,14 @@ def _normalize(text: str) -> str:
         text,
     )
 
-    return " ".join(text.split())
+    return " ".join(
+        text.split()
+    )
 
 
 def _candidate_texts(
     option: CanonicalOption,
 ) -> list[str]:
-
     values = [
         option.value,
         *option.labels,
@@ -38,6 +75,19 @@ def _candidate_texts(
         for value in values
         if value.strip()
     ]
+
+
+def _is_uncertain_response(
+    raw_text: str,
+) -> bool:
+    normalized_text = _normalize(
+        raw_text
+    )
+
+    return any(
+        _normalize(marker) in normalized_text
+        for marker in UNCERTAINTY_MARKERS
+    )
 
 
 def resolve_closed_set_answer(
@@ -56,21 +106,48 @@ def resolve_closed_set_answer(
             confidence=0,
         )
 
-    normalized_raw = _normalize(raw_text)
+    # ---------------------------------------------------------
+    # Handle explicit uncertainty BEFORE option matching.
+    #
+    # Example:
+    #
+    # "मुझे पता नहीं"
+    #
+    # contains "नहीं", but that does NOT mean the respondent
+    # selected the "No" option.
+    # ---------------------------------------------------------
+
+    if _is_uncertain_response(
+        raw_text
+    ):
+        return AnswerResolution(
+            raw_text=raw_text,
+            stored_option=stored_option,
+            status="UNCERTAIN",
+            confidence=0,
+            candidates=[],
+        )
+
+    normalized_raw = _normalize(
+        raw_text
+    )
 
     scored: list[ResolutionCandidate] = []
 
     for option in options:
-
         best_score = 0.0
         best_text = option.value
 
-        for candidate_text in _candidate_texts(option):
-
-            score = fuzz.WRatio(
-                normalized_raw,
-                _normalize(candidate_text),
-            ) / 100
+        for candidate_text in _candidate_texts(
+            option
+        ):
+            score = (
+                fuzz.WRatio(
+                    normalized_raw,
+                    _normalize(candidate_text),
+                )
+                / 100
+            )
 
             if score > best_score:
                 best_score = score
@@ -80,7 +157,10 @@ def resolve_closed_set_answer(
             ResolutionCandidate(
                 option=option.value,
                 matched_text=best_text,
-                score=round(best_score, 4),
+                score=round(
+                    best_score,
+                    4,
+                ),
             )
         )
 
