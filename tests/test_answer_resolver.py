@@ -1,22 +1,33 @@
 from src.resolver.closed_set import (
     resolve_closed_set_answer,
 )
-from src.resolver.models import CanonicalOption
+from src.resolver.models import (
+    CanonicalOption,
+)
 
 
 def make_options():
     return [
         CanonicalOption(
             value="Badlapur",
-            labels=["Badlapur", "बदलापुर"],
+            labels=[
+                "Badlapur",
+                "बदलापुर",
+            ],
         ),
         CanonicalOption(
             value="Bijnor",
-            labels=["Bijnor", "बिजनौर"],
+            labels=[
+                "Bijnor",
+                "बिजनौर",
+            ],
         ),
         CanonicalOption(
             value="Milak",
-            labels=["Milak", "मिलक"],
+            labels=[
+                "Milak",
+                "मिलक",
+            ],
         ),
     ]
 
@@ -56,7 +67,7 @@ def test_mismatch():
 
 def test_uncertain_when_text_is_unrelated():
     result = resolve_closed_set_answer(
-        raw_text="I do not know",
+        raw_text="I do not understand this question",
         options=make_options(),
         stored_option="Badlapur",
     )
@@ -65,34 +76,109 @@ def test_uncertain_when_text_is_unrelated():
 
 
 def test_hindi_asr_resolves_bilingual_option():
+    options = [
+        CanonicalOption(
+            value="Badlapur",
+            labels=[
+                "Badlapur",
+                "बदलापुर",
+                "364. बदलापुर [Badlapur]",
+            ],
+        ),
+        CanonicalOption(
+            value="Bijnor",
+            labels=[
+                "Bijnor",
+                "बिजनौर",
+            ],
+        ),
+    ]
+
     result = resolve_closed_set_answer(
         raw_text="बदलापुर",
-        options=[
-            CanonicalOption(
-                value="Badlapur",
-                labels=[
-                    "बदलापुर",
-                    "Badlapur",
-                    "364. बदलापुर [Badlapur]",
-                ],
-            ),
-            CanonicalOption(
-                value="Bijnor",
-                labels=[
-                    "बिजनौर",
-                    "Bijnor",
-                ],
-            ),
-            CanonicalOption(
-                value="Milak",
-                labels=[
-                    "मिलक",
-                    "Milak",
-                ],
-            ),
-        ],
+        options=options,
         stored_option="Badlapur",
     )
 
     assert result.resolved_option == "Badlapur"
     assert result.status == "MATCH"
+
+
+def test_pata_nahi_is_not_resolved_as_no():
+    options = [
+        CanonicalOption(
+            value="Yes",
+            labels=[
+                "Yes",
+                "हाँ",
+                "हां",
+            ],
+        ),
+        CanonicalOption(
+            value="No",
+            labels=[
+                "No",
+                "नहीं",
+                "नही",
+            ],
+        ),
+    ]
+
+    result = resolve_closed_set_answer(
+        raw_text="मुझे पता नहीं",
+        options=options,
+        stored_option="Yes",
+    )
+
+    assert result.status == "UNCERTAIN"
+    assert result.resolved_option is None
+
+
+def test_maloom_nahi_is_not_resolved_as_no():
+    options = [
+        CanonicalOption(
+            value="Yes",
+            labels=[
+                "Yes",
+                "हाँ",
+            ],
+        ),
+        CanonicalOption(
+            value="No",
+            labels=[
+                "No",
+                "नहीं",
+            ],
+        ),
+    ]
+
+    result = resolve_closed_set_answer(
+        raw_text="मालूम नहीं",
+        options=options,
+        stored_option="No",
+    )
+
+    assert result.status == "UNCERTAIN"
+    assert result.resolved_option is None
+
+
+def test_dont_know_is_uncertain():
+    options = [
+        CanonicalOption(
+            value="Yes",
+            labels=["Yes"],
+        ),
+        CanonicalOption(
+            value="No",
+            labels=["No"],
+        ),
+    ]
+
+    result = resolve_closed_set_answer(
+        raw_text="I don't know",
+        options=options,
+        stored_option="Yes",
+    )
+
+    assert result.status == "UNCERTAIN"
+    assert result.resolved_option is None
