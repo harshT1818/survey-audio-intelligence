@@ -3,3 +3,7 @@ python-dotenv
 pytest
 requests
 mutagen
+torch
+torchaudio
+transformers
+accelerate
