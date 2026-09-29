@@ -1,103 +1,66 @@
+import argparse
 import json
 from pathlib import Path
 
-from src.speaker_roles.models import (
-    RawSpeakerTurn,
-)
-from src.speaker_roles.rules import (
+from src.full_sample.speaker_roles import (
     infer_speaker_roles,
-)
-
-
-ASR_PATH = Path(
-    "data/private/manual/"
-    "manual_dialogue_test_01_segment_asr.json"
-)
-
-CLIP_MANIFEST_PATH = Path(
-    "data/private/manual/"
-    "manual_dialogue_test_01_speaker_clips.json"
-)
-
-OUTPUT_PATH = Path(
-    "data/private/manual/"
-    "manual_dialogue_test_01_inferred_turns.json"
 )
 
 
 def load_json(
     path: Path,
 ):
-    with open(
-        path,
-        "r",
-        encoding="utf-8",
-    ) as file:
-        return json.load(
-            file
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Missing: {path}"
         )
+
+    return json.loads(
+        path.read_text(
+            encoding="utf-8"
+        )
+    )
 
 
 def main():
-    asr_payload = load_json(
-        ASR_PATH
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--response-id",
+        required=True,
     )
 
-    clip_manifest = load_json(
-        CLIP_MANIFEST_PATH
+    args = parser.parse_args()
+
+    sample_dir = (
+        Path("data/private/r2")
+        / args.response_id
     )
 
-    timing_by_clip_id = {
-        clip["clip_id"]: clip
-        for clip in clip_manifest[
-            "clips"
-        ]
-    }
-
-    raw_turns = []
-
-    for item in asr_payload:
-        clip_id = item[
-            "clip_id"
-        ]
-
-        clip = timing_by_clip_id.get(
-            clip_id
+    dialogue_path = (
+        sample_dir
+        / (
+            "question_dialogue_"
+            "segments.json"
         )
+    )
 
-        if clip is None:
-            raise ValueError(
-                f"Missing timing for {clip_id}"
-            )
-
-        raw_turns.append(
-            RawSpeakerTurn(
-                segment_id=clip_id,
-                speaker_id=(
-                    item["speaker_id"]
-                ),
-                text=item["text"],
-                start_sec=(
-                    clip["start_sec"]
-                ),
-                end_sec=(
-                    clip["end_sec"]
-                ),
-            )
-        )
+    questions = load_json(
+        dialogue_path
+    )
 
     result = infer_speaker_roles(
-        raw_turns
+        questions
     )
 
-    OUTPUT_PATH.parent.mkdir(
-        parents=True,
-        exist_ok=True,
+    output_path = (
+        sample_dir
+        / "speaker_roles.json"
     )
 
-    OUTPUT_PATH.write_text(
+    output_path.write_text(
         json.dumps(
-            result.model_dump(),
+            result,
             ensure_ascii=False,
             indent=2,
         ),
@@ -106,102 +69,88 @@ def main():
 
     print()
     print(
-        "=== SPEAKER ROLE INFERENCE ==="
+        "=== SPEAKER ROLE "
+        "INFERENCE ==="
     )
     print()
 
     print(
-        "Dominant agent speaker:",
-        result.dominant_agent_speaker_id,
+        f"Response ID: "
+        f"{args.response_id}"
     )
 
     print(
-        "Dominant respondent speaker:",
-        result.dominant_respondent_speaker_id,
+        f"Status:      "
+        f"{result['status']}"
     )
 
-    print()
-
-    counts = {
-        "agent": 0,
-        "respondent": 0,
-        "unknown": 0,
-    }
-
-    review_count = 0
-
-    for turn in result.turns:
-        counts[
-            turn.role
-        ] += 1
-
-        if turn.review_required:
-            review_count += 1
-
-        review = (
-            " REVIEW"
-            if turn.review_required
-            else ""
-        )
-
+    if (
+        result["status"]
+        == "RESOLVED"
+    ):
         print(
-            f"{turn.segment_id:28} "
-            f"{turn.start_sec:6.2f}"
-            f" → "
-            f"{turn.end_sec:6.2f}  "
-            f"{turn.speaker_id:10} "
-            f"→ "
-            f"{turn.role:10} "
-            f"{turn.role_score:.2f}"
-            f"{review}"
-        )
-
-        print(
-            f"    {turn.text}"
+            f"Confidence:  "
+            f"{result['confidence']}"
         )
 
         print()
 
-    print(
-        "=" * 70
-    )
+        for (
+            speaker_id,
+            role_data,
+        ) in result[
+            "roles"
+        ].items():
+            print(
+                f"{speaker_id:12} "
+                f"→ "
+                f"{role_data['role']:10} "
+                f"("
+                f"{role_data['confidence']}"
+                f")"
+            )
+
+    else:
+        print(
+            f"Reason:      "
+            f"{result['reason']}"
+        )
+
+    print()
 
     print(
-        "RESULT"
+        "Speaker totals:"
     )
 
-    print(
-        "=" * 70
-    )
+    for (
+        speaker_id,
+        duration,
+    ) in result[
+        "speaker_totals_sec"
+    ].items():
+        print(
+            f"  {speaker_id:12} "
+            f"{duration:.2f}s"
+        )
+
+    print()
 
     print(
-        f"Total turns:       "
-        f"{len(result.turns)}"
+        "Evidence:"
     )
 
-    print(
-        f"Agent turns:       "
-        f"{counts['agent']}"
-    )
-
-    print(
-        f"Respondent turns:  "
-        f"{counts['respondent']}"
-    )
-
-    print(
-        f"Unknown turns:     "
-        f"{counts['unknown']}"
-    )
-
-    print(
-        f"Review required:   "
-        f"{review_count}"
-    )
+    for evidence in result[
+        "evidence"
+    ]:
+        print(
+            f"  - "
+            f"{evidence['type']}: "
+            f"{evidence}"
+        )
 
     print()
     print(
-        f"Saved: {OUTPUT_PATH}"
+        f"Saved: {output_path}"
     )
 
 
