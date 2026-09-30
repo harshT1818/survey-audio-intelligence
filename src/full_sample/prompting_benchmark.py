@@ -2,6 +2,8 @@ import re
 import unicodedata
 from typing import Any
 
+from rapidfuzz import fuzz
+
 from src.prompting.rules import (
     detect_prompting,
 )
@@ -37,6 +39,26 @@ TEXT_FIELDS = [
 ]
 
 
+MIN_QUESTION_ANCHOR_SCORE = 0.60
+
+
+DO_NOT_READ_PATTERN = re.compile(
+    r"DO\s*NOT\s*READ\s*THE\s*OPTIONS",
+    flags=re.IGNORECASE,
+)
+
+
+NOTE_PATTERN = re.compile(
+    r"\[\s*Note\s*:[^\]]*\]",
+    flags=re.IGNORECASE,
+)
+
+
+DYNAMIC_REFERENCE_PATTERN = re.compile(
+    r"\$#[A-Za-z0-9_]+-[A-Za-z0-9_]+"
+)
+
+
 def normalize_text(
     value: Any,
 ) -> str:
@@ -55,6 +77,49 @@ def normalize_text(
         " ",
         text,
     )
+
+    return text
+
+
+def normalize_for_similarity(
+    value: Any,
+) -> str:
+    text = normalize_text(
+        value
+    )
+
+    text = (
+        DYNAMIC_REFERENCE_PATTERN.sub(
+            " ",
+            text,
+        )
+    )
+
+    text = NOTE_PATTERN.sub(
+        " ",
+        text,
+    )
+
+    match = DO_NOT_READ_PATTERN.search(
+        text
+    )
+
+    if match:
+        text = text[
+            :match.start()
+        ]
+
+    text = re.sub(
+        r"[^\w\s\u0900-\u097F]",
+        " ",
+        text,
+    )
+
+    text = re.sub(
+        r"\s+",
+        " ",
+        text,
+    ).strip()
 
     return text
 
@@ -110,19 +175,21 @@ def infer_human_prompting_label(
     value: Any,
 ) -> str:
     """
-    Convert the human Audit CRM disposition payload into
-    a coarse prompting label.
+    Convert human Audit CRM disposition data into a
+    coarse prompting label.
 
-    We intentionally check NO_PROMPTING before PROMPTING
-    because strings such as "No Prompting Done" still
-    contain the word "Prompting".
+    NO_PROMPTING is deliberately checked first because
+    values such as "No Prompting Done" contain the word
+    "Prompting".
     """
     texts = flatten_strings(
         value
     )
 
     combined = normalize_text(
-        " | ".join(texts)
+        " | ".join(
+            texts
+        )
     )
 
     no_prompting_markers = [
@@ -197,7 +264,9 @@ def _option_texts_from_item(
 
     if values:
         return list(
-            dict.fromkeys(values)
+            dict.fromkeys(
+                values
+            )
         )
 
     return []
@@ -214,8 +283,13 @@ def _collect_option_containers(
     ):
         for key, value in node.items():
             normalized_key = (
-                normalize_text(key)
-                .replace(" ", "_")
+                normalize_text(
+                    key
+                )
+                .replace(
+                    " ",
+                    "_",
+                )
             )
 
             if (
@@ -261,12 +335,14 @@ def extract_canonical_options(
     ),
 ) -> list[CanonicalOption]:
     """
-    Extract options only from explicit option/choice
-    containers inside policy `data`.
+    Legacy Audit CRM extraction helper.
 
-    raw_response is deliberately NOT used as an option
-    source, because using the already-selected answer as
-    the only possible option would bias prompting detection.
+    raw_response is deliberately NOT used as a source
+    of possible options because it contains the already
+    selected answer and would bias prompting detection.
+
+    Real SurveyXpress choices should now normally come
+    from survey_definition.json via survey_options.py.
     """
     if not policy_entry:
         return []
@@ -376,6 +452,325 @@ def _usable_turns(
     ]
 
 
+def question_turn_similarity(
+    question_text: str,
+    transcript: str,
+) -> float:
+    """
+    Compare an ASR agent turn against the actual survey
+    question.
+
+    partial_ratio helps when the spoken question is noisy
+    or shortened.
+
+    token_set_ratio rewards shared meaningful words while
+    being less sensitive to ordering / filler.
+    """
+    question = (
+        normalize_for_similarity(
+            question_text
+        )
+    )
+
+    spoken = (
+        normalize_for_similarity(
+            transcript
+        )
+    )
+
+    if not question or not spoken:
+        return 0.0
+
+    partial = (
+        fuzz.partial_ratio(
+            question,
+            spoken,
+        )
+        / 100.0
+    )
+
+    token_set = (
+        fuzz.token_set_ratio(
+            question,
+            spoken,
+        )
+        / 100.0
+    )
+
+    score = (
+        0.75 * partial
+        + 0.25 * token_set
+    )
+
+    return round(
+        score,
+        4,
+    )
+
+
+def select_question_anchor(
+    dialogue: dict[str, Any],
+    question_window: dict[str, Any],
+) -> dict[str, Any]:
+    usable = _usable_turns(
+        dialogue
+    )
+
+    question_start = float(
+        question_window.get(
+            "start_sec",
+            0.0,
+        )
+    )
+
+    raw_end = (
+        question_window.get(
+            "end_sec"
+        )
+    )
+
+    question_end = (
+        float(raw_end)
+        if raw_end is not None
+        else None
+    )
+
+    agent_turns = [
+        turn
+        for turn in usable
+        if (
+            turn.get(
+                "role"
+            )
+            == "agent"
+            and float(
+                turn.get(
+                    "start_sec",
+                    0.0,
+                )
+            )
+            >= (
+                question_start
+                - 0.25
+            )
+            and (
+                question_end is None
+                or float(
+                    turn.get(
+                        "start_sec",
+                        0.0,
+                    )
+                )
+                <= (
+                    question_end
+                    + 0.50
+                )
+            )
+        )
+    ]
+
+    if not agent_turns:
+        return {
+            "turn": None,
+            "score": None,
+            "method": (
+                "NO_AGENT_TURN"
+            ),
+            "candidates": [],
+        }
+
+    question_text = str(
+        dialogue.get(
+            "question_text"
+        )
+        or question_window.get(
+            "question_text"
+        )
+        or ""
+    ).strip()
+
+    if not question_text:
+        first = agent_turns[0]
+
+        return {
+            "turn": first,
+            "score": None,
+            "method": (
+                "FIRST_AGENT_FALLBACK"
+            ),
+            "candidates": [],
+        }
+
+    scored = []
+
+    for turn in agent_turns:
+        score = (
+            question_turn_similarity(
+                question_text=(
+                    question_text
+                ),
+                transcript=str(
+                    turn.get(
+                        "transcript",
+                        "",
+                    )
+                ),
+            )
+        )
+
+        scored.append(
+            {
+                "turn": turn,
+                "score": score,
+            }
+        )
+
+    scored.sort(
+        key=lambda item: (
+            -item[
+                "score"
+            ],
+            float(
+                item[
+                    "turn"
+                ].get(
+                    "start_sec",
+                    0.0,
+                )
+            ),
+        )
+    )
+
+    candidates = [
+        {
+            "turn_index": (
+                item[
+                    "turn"
+                ].get(
+                    "turn_index"
+                )
+            ),
+            "start_sec": (
+                item[
+                    "turn"
+                ].get(
+                    "start_sec"
+                )
+            ),
+            "end_sec": (
+                item[
+                    "turn"
+                ].get(
+                    "end_sec"
+                )
+            ),
+            "score": (
+                item[
+                    "score"
+                ]
+            ),
+            "transcript": (
+                item[
+                    "turn"
+                ].get(
+                    "transcript"
+                )
+            ),
+        }
+        for item
+        in scored[:3]
+    ]
+
+    best = scored[0]
+
+    if (
+        best["score"]
+        < MIN_QUESTION_ANCHOR_SCORE
+    ):
+        return {
+            "turn": None,
+            "score": (
+                best[
+                    "score"
+                ]
+            ),
+            "method": (
+                "QUESTION_TEXT_LOW_SIMILARITY"
+            ),
+            "candidates": candidates,
+        }
+
+    return {
+        "turn": (
+            best["turn"]
+        ),
+        "score": (
+            best["score"]
+        ),
+        "method": (
+            "QUESTION_TEXT_SIMILARITY"
+        ),
+        "candidates": candidates,
+    }
+
+
+def _base_result(
+    prediction: str,
+    review_required: bool,
+    reason: str,
+    *,
+    detector_result: Any = None,
+    anchor_agent_turn: Any = None,
+    initial_respondent_turn: Any = None,
+    agent_followup_turns: (
+        list[dict[str, Any]]
+        | None
+    ) = None,
+    anchor_similarity: (
+        float
+        | None
+    ) = None,
+    anchor_method: (
+        str
+        | None
+    ) = None,
+    anchor_candidates: (
+        list[dict[str, Any]]
+        | None
+    ) = None,
+) -> dict[str, Any]:
+    return {
+        "prediction": prediction,
+        "review_required": (
+            review_required
+        ),
+        "reason": reason,
+        "detector_result": (
+            detector_result
+        ),
+        "anchor_agent_turn": (
+            anchor_agent_turn
+        ),
+        "initial_respondent_turn": (
+            initial_respondent_turn
+        ),
+        "agent_followup_turns": (
+            agent_followup_turns
+            or []
+        ),
+        "anchor_similarity": (
+            anchor_similarity
+        ),
+        "anchor_method": (
+            anchor_method
+        ),
+        "anchor_candidates": (
+            anchor_candidates
+            or []
+        ),
+    }
+
+
 def evaluate_prompting_dialogue(
     dialogue: dict[str, Any],
     question_window: dict[str, Any],
@@ -384,19 +779,23 @@ def evaluate_prompting_dialogue(
     ],
 ) -> dict[str, Any]:
     """
-    Adapt a real role-labelled dialogue to the existing
+    Adapt real role-labelled dialogue to the existing
     detect_prompting() interface.
 
-    We do not invent missing respondent speech.
+    Important safety rule:
+    the question anchor is selected by similarity to the
+    actual SurveyXpress question text, not merely by taking
+    the first agent speech in the question time window.
 
     Flow:
-        question starts
-        -> first usable agent turn
-        -> first usable respondent turn
-        -> any later usable agent speech becomes follow-up
 
-    If the respondent is not recoverable from ASR after the
-    question begins, classification is withheld.
+        survey question text
+        -> best matching usable agent turn
+        -> first usable respondent after that anchor
+        -> subsequent agent speech
+        -> existing prompting detector
+
+    Missing respondent speech is never invented.
     """
     if (
         dialogue.get(
@@ -404,38 +803,80 @@ def evaluate_prompting_dialogue(
         )
         != "ROLE_DIALOGUE_AVAILABLE"
     ):
-        return {
-            "prediction": (
+        return _base_result(
+            prediction=(
                 "INSUFFICIENT_ROLE_EVIDENCE"
             ),
-            "review_required": True,
-            "reason": (
+            review_required=True,
+            reason=(
                 "Both usable agent and respondent "
                 "speech were not available."
             ),
-            "detector_result": None,
-            "anchor_agent_turn": None,
-            "initial_respondent_turn": None,
-            "agent_followup_turns": [],
-        }
-
-    question_start = float(
-        question_window[
-            "start_sec"
-        ]
-    )
+        )
 
     usable = _usable_turns(
         dialogue
     )
 
-    agent_turns = [
-        turn
-        for turn in usable
-        if turn.get(
-            "role"
-        ) == "agent"
-    ]
+    anchor_result = (
+        select_question_anchor(
+            dialogue=dialogue,
+            question_window=(
+                question_window
+            ),
+        )
+    )
+
+    anchor_agent = (
+        anchor_result[
+            "turn"
+        ]
+    )
+
+    if anchor_agent is None:
+        if (
+            anchor_result[
+                "method"
+            ]
+            == (
+                "QUESTION_TEXT_LOW_SIMILARITY"
+            )
+        ):
+            reason = (
+                "Agent speech was available, but no "
+                "turn matched the SurveyXpress "
+                "question strongly enough to use as "
+                "a safe question anchor."
+            )
+        else:
+            reason = (
+                "No usable agent question turn "
+                "was found for this survey "
+                "question."
+            )
+
+        return _base_result(
+            prediction=(
+                "INSUFFICIENT_ROLE_EVIDENCE"
+            ),
+            review_required=True,
+            reason=reason,
+            anchor_similarity=(
+                anchor_result[
+                    "score"
+                ]
+            ),
+            anchor_method=(
+                anchor_result[
+                    "method"
+                ]
+            ),
+            anchor_candidates=(
+                anchor_result[
+                    "candidates"
+                ]
+            ),
+        )
 
     respondent_turns = [
         turn
@@ -445,37 +886,13 @@ def evaluate_prompting_dialogue(
         ) == "respondent"
     ]
 
-    anchor_agent = next(
-        (
-            turn
-            for turn in agent_turns
-            if float(
-                turn["start_sec"]
-            )
-            >= (
-                question_start
-                - 0.05
-            )
-        ),
-        None,
-    )
-
-    if anchor_agent is None:
-        return {
-            "prediction": (
-                "INSUFFICIENT_ROLE_EVIDENCE"
-            ),
-            "review_required": True,
-            "reason": (
-                "No usable agent question turn "
-                "was found after the survey "
-                "question start."
-            ),
-            "detector_result": None,
-            "anchor_agent_turn": None,
-            "initial_respondent_turn": None,
-            "agent_followup_turns": [],
-        }
+    agent_turns = [
+        turn
+        for turn in usable
+        if turn.get(
+            "role"
+        ) == "agent"
+    ]
 
     anchor_end = float(
         anchor_agent[
@@ -489,7 +906,9 @@ def evaluate_prompting_dialogue(
             for turn
             in respondent_turns
             if float(
-                turn["start_sec"]
+                turn[
+                    "start_sec"
+                ]
             )
             >= (
                 anchor_end
@@ -500,23 +919,35 @@ def evaluate_prompting_dialogue(
     )
 
     if initial_respondent is None:
-        return {
-            "prediction": (
+        return _base_result(
+            prediction=(
                 "INSUFFICIENT_ROLE_EVIDENCE"
             ),
-            "review_required": True,
-            "reason": (
+            review_required=True,
+            reason=(
                 "No usable respondent speech "
-                "was recovered after the agent "
-                "question turn."
+                "was recovered after the matched "
+                "agent question turn."
             ),
-            "detector_result": None,
-            "anchor_agent_turn": (
+            anchor_agent_turn=(
                 anchor_agent
             ),
-            "initial_respondent_turn": None,
-            "agent_followup_turns": [],
-        }
+            anchor_similarity=(
+                anchor_result[
+                    "score"
+                ]
+            ),
+            anchor_method=(
+                anchor_result[
+                    "method"
+                ]
+            ),
+            anchor_candidates=(
+                anchor_result[
+                    "candidates"
+                ]
+            ),
+        )
 
     respondent_end = float(
         initial_respondent[
@@ -528,7 +959,9 @@ def evaluate_prompting_dialogue(
         turn
         for turn in agent_turns
         if float(
-            turn["start_sec"]
+            turn[
+                "start_sec"
+            ]
         )
         >= (
             respondent_end
@@ -545,7 +978,9 @@ def evaluate_prompting_dialogue(
     agent_followup_text = (
         " ".join(
             str(
-                turn["transcript"]
+                turn[
+                    "transcript"
+                ]
             )
             for turn in followups
             if str(
@@ -567,58 +1002,7 @@ def evaluate_prompting_dialogue(
         options=options,
     )
 
-    if (
-        initial_respondent.get(
-            "cross_speaker_overlap"
-        )
-        and detector.status
-        == "PROMPTING_EVIDENCE"
-    ):
-        return {
-            "prediction": "UNCERTAIN",
-            "review_required": True,
-            "reason": (
-                "Prompting-like evidence was "
-                "detected, but the initial "
-                "respondent turn overlaps another "
-                "speaker and is unsafe for "
-                "automatic classification."
-            ),
-            "detector_result": (
-                detector.model_dump()
-            ),
-            "anchor_agent_turn": (
-                anchor_agent
-            ),
-            "initial_respondent_turn": (
-                initial_respondent
-            ),
-            "agent_followup_turns": (
-                followups
-            ),
-        }
-
-    if (
-        detector.status
-        == "PROMPTING_EVIDENCE"
-    ):
-        prediction = "PROMPTING"
-
-    elif (
-        detector.status
-        == "NO_PROMPTING_EVIDENCE"
-    ):
-        prediction = "NO_PROMPTING"
-
-    else:
-        prediction = "UNCERTAIN"
-
-    return {
-        "prediction": prediction,
-        "review_required": (
-            detector.review_required
-        ),
-        "reason": detector.reason,
+    common = {
         "detector_result": (
             detector.model_dump()
         ),
@@ -631,7 +1015,68 @@ def evaluate_prompting_dialogue(
         "agent_followup_turns": (
             followups
         ),
+        "anchor_similarity": (
+            anchor_result[
+                "score"
+            ]
+        ),
+        "anchor_method": (
+            anchor_result[
+                "method"
+            ]
+        ),
+        "anchor_candidates": (
+            anchor_result[
+                "candidates"
+            ]
+        ),
     }
+
+    if (
+        initial_respondent.get(
+            "cross_speaker_overlap"
+        )
+        and detector.status
+        == "PROMPTING_EVIDENCE"
+    ):
+        return _base_result(
+            prediction="UNCERTAIN",
+            review_required=True,
+            reason=(
+                "Prompting-like evidence was "
+                "detected, but the initial "
+                "respondent turn overlaps another "
+                "speaker and is unsafe for "
+                "automatic classification."
+            ),
+            **common,
+        )
+
+    if (
+        detector.status
+        == "PROMPTING_EVIDENCE"
+    ):
+        prediction = "PROMPTING"
+
+    elif (
+        detector.status
+        == "NO_PROMPTING_EVIDENCE"
+    ):
+        prediction = (
+            "NO_PROMPTING"
+        )
+
+    else:
+        prediction = "UNCERTAIN"
+
+    return _base_result(
+        prediction=prediction,
+        review_required=(
+            detector.review_required
+        ),
+        reason=detector.reason,
+        **common,
+    )
 
 
 def compare_prompting_prediction(
