@@ -5,9 +5,11 @@ from pathlib import Path
 from src.full_sample.prompting_benchmark import (
     compare_prompting_prediction,
     evaluate_prompting_dialogue,
-    extract_canonical_options,
-    find_policy_entry,
     infer_human_prompting_label,
+)
+from src.full_sample.survey_options import (
+    canonical_options_from_question,
+    survey_question_map,
 )
 
 
@@ -83,9 +85,9 @@ def main():
         / "question_asr.json"
     )
 
-    policy = load_json(
+    survey_definition = load_json(
         sample_dir
-        / "audit_policy_snapshot.json"
+        / "survey_definition.json"
     )
 
     human_audit = load_json(
@@ -102,6 +104,12 @@ def main():
         item["tag"]: item
         for item in question_asr
     }
+
+    survey_by_tag = (
+        survey_question_map(
+            survey_definition
+        )
+    )
 
     results = []
 
@@ -137,27 +145,45 @@ def main():
             )
         )
 
+        survey_question = (
+            survey_by_tag.get(
+                tag
+            )
+        )
+
         if (
             dialogue is None
             or question is None
         ):
             print(
                 f"WARNING: missing "
-                f"data for {tag}"
+                f"dialogue/question data "
+                f"for {tag}"
             )
             continue
 
-        policy_entry = (
-            find_policy_entry(
-                policy,
-                tag,
+        options = (
+            canonical_options_from_question(
+                survey_question
             )
         )
 
-        options = (
-            extract_canonical_options(
-                policy_entry
+        catalog_status = (
+            survey_question.get(
+                "choice_catalog_status",
+                "MISSING",
             )
+            if survey_question
+            else "MISSING"
+        )
+
+        do_not_read = (
+            survey_question.get(
+                "do_not_read_options",
+                False,
+            )
+            if survey_question
+            else False
         )
 
         human_payload = (
@@ -201,6 +227,22 @@ def main():
             )
         )
 
+        detector_status = None
+        suggested_option = None
+
+        if detector_result:
+            detector_status = (
+                detector_result.get(
+                    "status"
+                )
+            )
+
+            suggested_option = (
+                detector_result.get(
+                    "suggested_option"
+                )
+            )
+
         record = {
             "tag": tag,
             "stored_response": (
@@ -221,6 +263,12 @@ def main():
                 evaluation[
                     "review_required"
                 ]
+            ),
+            "survey_catalog_status": (
+                catalog_status
+            ),
+            "do_not_read_options": (
+                do_not_read
             ),
             "option_count": len(
                 options
@@ -279,9 +327,32 @@ def main():
         )
 
         print(
+            f"  Catalog:    "
+            f"{catalog_status}"
+        )
+
+        print(
             f"  Options:    "
             f"{len(options)}"
         )
+
+        print(
+            f"  DNR options:"
+            f" "
+            f"{do_not_read}"
+        )
+
+        if detector_status:
+            print(
+                f"  Detector:   "
+                f"{detector_status}"
+            )
+
+        if suggested_option:
+            print(
+                f"  Suggested:  "
+                f"{shorten(suggested_option)}"
+            )
 
         initial = (
             evaluation.get(
