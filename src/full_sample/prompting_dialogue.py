@@ -159,15 +159,15 @@ def build_prompting_dialogue(
 
             if not exported:
                 transcript = ""
-
-                asr_status = "SKIPPED_SHORT"
+                asr_status = (
+                    "SKIPPED_SHORT"
+                )
 
             elif (
                 audio_filename
                 not in asr_lookup
             ):
                 transcript = ""
-
                 asr_status = "MISSING"
 
             else:
@@ -224,6 +224,21 @@ def build_prompting_dialogue(
                     )
                 )
 
+            raw_overlap = bool(
+                row.get(
+                    "raw_cross_speaker_overlap",
+                    False,
+                )
+            )
+
+            raw_overlap_sec = float(
+                row.get(
+                    "raw_cross_speaker_overlap_sec",
+                    0.0,
+                )
+                or 0.0
+            )
+
             turn = {
                 "turn_index": (
                     row.get(
@@ -267,6 +282,12 @@ def build_prompting_dialogue(
                     "regions",
                     [],
                 ),
+                "source_segment_indices": (
+                    row.get(
+                        "source_segment_indices",
+                        [],
+                    )
+                ),
                 "export_for_asr": (
                     exported
                 ),
@@ -284,6 +305,58 @@ def build_prompting_dialogue(
                 ),
                 "cross_speaker_overlap": (
                     cross_speaker_overlap
+                ),
+                "raw_cross_speaker_overlap": (
+                    raw_overlap
+                ),
+                "raw_cross_speaker_overlap_sec": (
+                    round(
+                        raw_overlap_sec,
+                        3,
+                    )
+                ),
+                "raw_overlapping_turns": (
+                    row.get(
+                        "raw_overlapping_turns",
+                        [],
+                    )
+                ),
+                "padding_clipped_for_speaker": bool(
+                    row.get(
+                        "padding_clipped_for_speaker",
+                        False,
+                    )
+                ),
+                "requested_padding_sec": (
+                    row.get(
+                        "requested_padding_sec"
+                    )
+                ),
+                "actual_left_padding_sec": (
+                    row.get(
+                        "actual_left_padding_sec"
+                    )
+                ),
+                "actual_right_padding_sec": (
+                    row.get(
+                        "actual_right_padding_sec"
+                    )
+                ),
+                "export_start_sec": (
+                    row.get(
+                        "export_start_sec",
+                        row.get(
+                            "padded_start_sec"
+                        ),
+                    )
+                ),
+                "export_end_sec": (
+                    row.get(
+                        "export_end_sec",
+                        row.get(
+                            "padded_end_sec"
+                        ),
+                    )
                 ),
             }
 
@@ -310,13 +383,25 @@ def build_prompting_dialogue(
         usable_agent_turns = [
             turn
             for turn in agent_turns
-            if turn["transcript"]
+            if (
+                turn["asr_status"]
+                == "COMPLETE"
+                and turn[
+                    "transcript"
+                ]
+            )
         ]
 
         usable_respondent_turns = [
             turn
             for turn in respondent_turns
-            if turn["transcript"]
+            if (
+                turn["asr_status"]
+                == "COMPLETE"
+                and turn[
+                    "transcript"
+                ]
+            )
         ]
 
         missing_asr_count = sum(
@@ -338,9 +423,20 @@ def build_prompting_dialogue(
         )
 
         overlap_count = sum(
-            turn[
-                "cross_speaker_overlap"
-            ]
+            bool(
+                turn[
+                    "cross_speaker_overlap"
+                ]
+            )
+            for turn in turns
+        )
+
+        raw_overlap_count = sum(
+            bool(
+                turn[
+                    "raw_cross_speaker_overlap"
+                ]
+            )
             for turn in turns
         )
 
@@ -420,6 +516,9 @@ def build_prompting_dialogue(
                 ),
                 "cross_speaker_overlap_count": (
                     overlap_count
+                ),
+                "raw_cross_speaker_overlap_count": (
+                    raw_overlap_count
                 ),
                 "turns": turns,
             }
