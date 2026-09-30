@@ -3,6 +3,9 @@ import json
 import subprocess
 from pathlib import Path
 
+from src.full_sample.speaker_safe_export import (
+    speaker_safe_export_bounds,
+)
 from src.full_sample.speaker_turns import (
     add_role_to_turns,
     mark_turn_exportability,
@@ -113,6 +116,18 @@ def main():
         default=DEFAULT_TAGS,
     )
 
+    parser.add_argument(
+        "--output-dir-name",
+        default="prompting_turn_audio",
+    )
+
+    parser.add_argument(
+        "--manifest-name",
+        default=(
+            "prompting_turn_manifest.json"
+        ),
+    )
+
     args = parser.parse_args()
 
     sample_dir = (
@@ -164,7 +179,7 @@ def main():
 
     output_dir = (
         sample_dir
-        / "prompting_turn_audio"
+        / args.output_dir_name
     )
 
     output_dir.mkdir(
@@ -188,6 +203,21 @@ def main():
     print(
         f"Tags:        "
         f"{len(args.tags)}"
+    )
+
+    print(
+        f"Max gap:     "
+        f"{args.max_gap_sec:.3f}s"
+    )
+
+    print(
+        f"Padding:     "
+        f"{args.padding_sec:.3f}s"
+    )
+
+    print(
+        f"Output dir:  "
+        f"{args.output_dir_name}"
     )
 
     print()
@@ -230,30 +260,31 @@ def main():
             )
         )
 
-        print(
-            f"{tag}"
-        )
+        print(tag)
 
         exported_for_question = 0
 
         for turn in turns:
-            raw_start = float(
-                turn["start_sec"]
+            bounds = (
+                speaker_safe_export_bounds(
+                    turn=turn,
+                    all_turns=turns,
+                    padding_sec=(
+                        args.padding_sec
+                    ),
+                )
             )
 
-            raw_end = float(
-                turn["end_sec"]
+            export_start = float(
+                bounds[
+                    "export_start_sec"
+                ]
             )
 
-            padded_start = max(
-                0.0,
-                raw_start
-                - args.padding_sec,
-            )
-
-            padded_end = (
-                raw_end
-                + args.padding_sec
+            export_end = float(
+                bounds[
+                    "export_end_sec"
+                ]
             )
 
             record = {
@@ -277,17 +308,14 @@ def main():
                     )
                 ),
                 **turn,
+                **bounds,
+                # Keep old names for downstream
+                # compatibility.
                 "padded_start_sec": (
-                    round(
-                        padded_start,
-                        3,
-                    )
+                    export_start
                 ),
                 "padded_end_sec": (
-                    round(
-                        padded_end,
-                        3,
-                    )
+                    export_end
                 ),
                 "audio_file": None,
             }
@@ -316,10 +344,10 @@ def main():
                         output_path
                     ),
                     start_sec=(
-                        padded_start
+                        export_start
                     ),
                     end_sec=(
-                        padded_end
+                        export_end
                     ),
                 )
 
@@ -343,15 +371,56 @@ def main():
                 else "SKIP"
             )
 
+            raw_start = float(
+                turn["start_sec"]
+            )
+
+            raw_end = float(
+                turn["end_sec"]
+            )
+
+            flags = []
+
+            if bounds[
+                "padding_clipped_for_speaker"
+            ]:
+                flags.append(
+                    "PAD_CLIPPED"
+                )
+
+            if bounds[
+                "raw_cross_speaker_overlap"
+            ]:
+                flags.append(
+                    (
+                        "RAW_OVERLAP="
+                        f"{bounds['raw_cross_speaker_overlap_sec']:.3f}s"
+                    )
+                )
+
+            flag_text = (
+                " | ".join(
+                    flags
+                )
+                if flags
+                else "-"
+            )
+
             print(
                 f"  "
                 f"{turn['turn_index']:02d} "
                 f"{turn['role']:10} "
-                f"{raw_start:7.2f}"
+                f"{raw_start:7.3f}"
                 f" → "
-                f"{raw_end:7.2f} "
-                f"{turn['duration_sec']:5.2f}s "
-                f"{status}"
+                f"{raw_end:7.3f} "
+                f"src="
+                f"{turn['source_segment_indices']} "
+                f"{status:6} "
+                f"export="
+                f"{export_start:.3f}"
+                f"→"
+                f"{export_end:.3f} "
+                f"{flag_text}"
             )
 
         print(
@@ -363,7 +432,7 @@ def main():
 
     manifest_path = (
         sample_dir
-        / "prompting_turn_manifest.json"
+        / args.manifest_name
     )
 
     manifest_path.write_text(
@@ -387,24 +456,53 @@ def main():
         - exported_count
     )
 
+    overlap_count = sum(
+        bool(
+            item[
+                "raw_cross_speaker_overlap"
+            ]
+        )
+        for item in manifest
+    )
+
+    clipped_count = sum(
+        bool(
+            item[
+                "padding_clipped_for_speaker"
+            ]
+        )
+        for item in manifest
+    )
+
     print(
         "=== EXPORT COMPLETE ==="
     )
+
     print()
 
     print(
-        f"Turn records: "
+        f"Turn records:       "
         f"{len(manifest)}"
     )
 
     print(
-        f"ASR clips:    "
+        f"ASR clips:          "
         f"{exported_count}"
     )
 
     print(
-        f"Skipped tiny: "
+        f"Skipped tiny:       "
         f"{skipped_count}"
+    )
+
+    print(
+        f"Raw overlaps:       "
+        f"{overlap_count}"
+    )
+
+    print(
+        f"Padding clipped:    "
+        f"{clipped_count}"
     )
 
     print()
