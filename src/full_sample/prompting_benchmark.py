@@ -543,10 +543,12 @@ def select_question_anchor(
                 "role"
             )
             == "agent"
+            and turn.get(
+                "start_sec"
+            ) is not None
             and float(
                 turn.get(
-                    "start_sec",
-                    0.0,
+                    "start_sec"
                 )
             )
             >= (
@@ -557,8 +559,7 @@ def select_question_anchor(
                 question_end is None
                 or float(
                     turn.get(
-                        "start_sec",
-                        0.0,
+                        "start_sec"
                     )
                 )
                 <= (
@@ -568,7 +569,7 @@ def select_question_anchor(
             )
         )
     ]
-
+    
     if not agent_turns:
         return {
             "turn": None,
