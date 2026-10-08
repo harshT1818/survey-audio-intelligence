@@ -569,7 +569,7 @@ def select_question_anchor(
             )
         )
     ]
-    
+
     if not agent_turns:
         return {
             "turn": None,

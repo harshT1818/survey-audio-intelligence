@@ -1,3 +1,5 @@
+import pytest
+
 from src.audit_policy.models import (
     AuditTagPolicy,
     DispositionNode,
@@ -167,6 +169,92 @@ def make_policy():
             )
         ),
     )
+
+
+@pytest.mark.parametrize("omit_start", [False, True])
+def test_timestamp_less_agent_cannot_anchor_near_zero(omit_start):
+    agent = make_turn(1, "agent", None, None, QUESTION_TEXT)
+    if omit_start:
+        agent.pop("start_sec")
+    dialogue = make_dialogue([
+        agent,
+        make_turn(2, "respondent", 1.0, 2.0, "हाँ"),
+    ])
+    window = {**make_window(), "start_sec": 0.0}
+
+    result = run_full_question_audit(
+        question=make_question(),
+        rich_dialogue=dialogue,
+        question_window=window,
+        canonical_options=make_options(),
+        tag_policy=make_policy(),
+    )
+
+    assert result.trace.anchor_found is False
+    assert result.trace.safe_audit_turn_count == 0
+    assert result.trace.corroboration_turn_count == 0
+    assert result.trace.review_required is True
+    assert result.automation.action == "HUMAN_REVIEW"
+    assert result.automation.review_required is True
+    assert result.automation.proposals == []
+
+
+def test_unrelated_question_withholds_audit_evidence():
+    dialogue = make_dialogue([
+        make_turn(1, "agent", 10.0, 12.0, "आज मौसम बहुत अच्छा है"),
+        make_turn(2, "respondent", 12.5, 13.5, "हाँ"),
+    ])
+
+    result = run_full_question_audit(
+        question=make_question(),
+        rich_dialogue=dialogue,
+        question_window=make_window(),
+        canonical_options=make_options(),
+        tag_policy=make_policy(),
+    )
+
+    assert result.trace.anchor_found is False
+    assert result.trace.anchor_method == "QUESTION_TEXT_LOW_SIMILARITY"
+    assert result.trace.safe_audit_turn_count == 0
+    assert result.trace.corroboration_turn_count == 0
+    assert result.trace.review_required is True
+    assert result.automation.action == "HUMAN_REVIEW"
+    assert result.automation.review_required is True
+    assert result.automation.proposals == []
+
+
+def test_unsafe_question_anchor_requires_review():
+    dialogue = make_dialogue([
+        make_turn(
+            1, "agent", 10.0, 12.0, QUESTION_TEXT,
+            raw_overlap=True, raw_overlap_sec=0.8,
+        ),
+        make_turn(2, "respondent", 12.5, 13.5, "हाँ"),
+    ])
+
+    inputs = build_safe_audit_inputs(
+        dialogue=dialogue,
+        question_window=make_window(),
+    )
+    assert inputs.trace.anchor_found is True
+    assert inputs.dialogue.turns == []
+    assert inputs.trace.safe_audit_turn_count == 0
+    assert inputs.trace.review_required is True
+    assert len(inputs.trace.rejected_turns) == 1
+    assert inputs.trace.rejected_turns[0].material_for_review is True
+    assert inputs.corroboration_turns[0].source_is_mixed is True
+    assert inputs.corroboration_turns[0].upstream_review_required is True
+
+    result = run_full_question_audit(
+        question=make_question(),
+        rich_dialogue=dialogue,
+        question_window=make_window(),
+        canonical_options=make_options(),
+        tag_policy=make_policy(),
+    )
+    assert result.automation.action != "AUTO_FILL"
+    assert result.automation.review_required is True
+    assert all(p.action != "AUTO_FILL" for p in result.automation.proposals)
 
 
 def test_adapter_removes_pre_anchor_turns():
@@ -410,6 +498,7 @@ def test_tiny_skipped_turn_does_not_poison_corroboration():
         in result.corroboration_turns
     )
 
+
 def test_missing_timestamps_are_preserved_as_none():
     dialogue = make_dialogue(
         [
@@ -444,6 +533,7 @@ def test_missing_timestamps_are_preserved_as_none():
 
     assert result.dialogue.turns[1].start_sec is None
     assert result.dialogue.turns[1].end_sec is None
+
 
 def test_missing_timestamps_do_not_become_material_duration():
     dialogue = make_dialogue(
