@@ -17,6 +17,7 @@ class PromptingDispositionSuggestion:
     status: str
     review_required: bool
     reason: str
+    comments_required: bool = False
 
 
 def _find_child(
@@ -60,8 +61,8 @@ def map_prompting_answer_disposition(
     resolution: AnswerResolution,
     prompting: PromptingEvidence,
     tag_policy: AuditTagPolicy,
-    no_prompting_path: list[str],
-    prompting_path: list[str],
+    no_prompting_path: list[str] | None,
+    prompting_path: list[str] | None,
 ) -> PromptingDispositionSuggestion:
 
     if not tag_policy.answer_validation.enabled:
@@ -124,6 +125,19 @@ def map_prompting_answer_disposition(
             ),
         )
 
+    if selected_path is None:
+        return PromptingDispositionSuggestion(
+            disposition_id=None,
+            disposition_text=None,
+            disposition_path=[],
+            status="NO_MAPPING",
+            review_required=True,
+            reason=(
+                "No disposition path is configured for this "
+                "prompting outcome, so it was left for review."
+            ),
+        )
+
     disposition = _find_disposition_path(
         nodes=tag_policy.answer_validation.dispositions,
         path=selected_path,
@@ -148,10 +162,11 @@ def map_prompting_answer_disposition(
         disposition_text=disposition.text,
         disposition_path=selected_path,
         status="SUGGESTED",
-        review_required=False,
+        review_required=disposition.comments_required,
         reason=(
             "Answer matched the stored response and "
             "prompting evidence was sufficiently clear "
             "to select the configured disposition."
         ),
+        comments_required=disposition.comments_required,
     )

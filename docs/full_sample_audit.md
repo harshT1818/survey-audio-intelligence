@@ -27,6 +27,18 @@ are distinct from mismatches; no suggestion is not counted as agreement.
 This is disposition agreement, not a measure of final P3 validity or accuracy.
 
 Only static, resolution-ready choice catalogs supply canonical options.
-Dynamic catalogs remain unresolved. No prompting disposition paths are guessed;
-the existing adapter and policy mapping decide what can be suggested.
+Dynamic catalogs remain unresolved. Answer dispositions depend on the shape of
+the tag's answer tree (`src/audit_policy/answer_tree.py`):
+
+| Shape | Recognised by | Suggestion |
+| --- | --- | --- |
+| Match/mismatch | top-level "Asked Right" and "Mismatch" | "Asked Right" on match, "Mismatch" on mismatch |
+| Flat prompting | top-level "Yes - No Prompting Done" | none by default; with `--prompting-aware-answers`, "Yes - No Prompting Done" for an unprompted match (prefill only) |
+| Nested prompting | "Respondent answer without Prompting" | none; selection rule pending client confirmation |
+| Introduction | "Yes - Perfect introduction" | none; speech-completeness rule not implemented |
+
+"Not Audible" is never suggested, because missing transcripts can be a
+pipeline failure. Prompted-party nodes ("Prompting -<party>") and
+combinations are left to the auditor. A node that requires a comment is
+never auto-filled; it can at most be prefilled.
 The runner is offline and does not update the CRM.

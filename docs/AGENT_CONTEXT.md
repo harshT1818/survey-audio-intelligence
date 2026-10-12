@@ -44,6 +44,7 @@ Paths are relative to `src/`. Package `__init__.py` files provide structure.
 | `prompting/models.py`, `rules.py` | Rule-based prompting evidence |
 | `audit_policy/models.py`, `parser.py` | Project/tag policy and nested dispositions; external key is spelled `desposition` |
 | `audit_policy/mapper.py`, `question_mapper.py`, `prompting_mapper.py` | Answer/question mapping and explicit nested prompting paths |
+| `audit_policy/answer_tree.py` | Classify answer trees (match/mismatch, flat/nested prompting, introduction) and the paths each may use |
 | `audit_engine/models.py`, `question_audit.py` | Core audit result/evidence and question orchestration |
 | `evidence_quality/models.py`, `gate.py` | Per-answer evidence gating |
 | `evidence_quality/corroboration_models.py`, `corroboration.py` | Direct/contextual support, conflicts, unsafe turn IDs and review reasons |
@@ -125,6 +126,13 @@ are comparison references, not input evidence for resolving the spoken answer.
 ## Safety and interpretation invariants
 
 - Preserve exact policy IDs, hierarchy, comments requirements and project scope.
+  `comments_required` flows into `SuggestedDisposition`; such nodes are capped
+  at PREFILL. Tag `desposition_type` is kept as `disposition_type`
+  (`multi_level_dropdown`, `no_validation`, `textbox`; multi-select exists in
+  the CRM but not in the current project).
+- Answer mapping depends on answer-tree shape; see `docs/full_sample_audit.md`.
+  Prompting-aware answer dispositions are capped at PREFILL and are off by
+  default in the batch runner (`--prompting-aware-answers` to experiment).
 - Separate speaker clustering from role attribution; allow unknown/extra speakers.
 - Anchor before selecting evidence; exclude pre-anchor and unsafe decision turns.
 - Preserve material unsafe evidence for review/corroboration, including raw overlap.
@@ -186,16 +194,36 @@ Use `python -X utf8 -m ...` for redirected Hindi/Unicode output on Windows.
 
 ## Next work and limitations
 
-1. Answer resolution produced no suggestions on any of 25 tags. Investigate per
-   tag (statement answers to yes/no questions, party/candidate aliases, scale
-   answers, agent-only dialogue) without lowering thresholds. Statement
-   answers now stay UNCERTAIN by design (see whole-answer invariant).
-2. Prompting paths are not configured in the batch runner although human labels
-   include prompting dispositions.
-3. Expand manually reviewed evaluation beyond this one sample before changing
+1. Answer resolution produced no suggestions on any of 25 tags. Diagnosis
+   (2026-10-12, one sample):
+   - 13 tags have prompting-shaped answer trees ("Yes - No Prompting Done",
+     "Respondent says <party>", "Prompting -<party>") with no "Asked Right".
+     Tree shapes are now classified (`answer_tree.py`); nested-prompting and
+     introduction rules await client confirmation (see item 2).
+   - Final respondent text was empty for 14 tags (no anchor, no safe respondent
+     turn, or gender not asked aloud) and a back-channel ("हाँ हाँ", "मतलब",
+     "कौन से") for most others; the real answer is often an earlier turn.
+   - Role errors: some respondent answers are attributed to the agent (for
+     example a CM-choice answer), so they never reach answer resolution.
+   - Some windows start after the question was spoken (no anchor found).
+   - Numeric/free-text tags (age, phone, dissatisfaction reason) and dynamic
+     choices have no resolver. Statement and verb-echo answers ("जानते हैं")
+     stay UNCERTAIN by design (see whole-answer invariant).
+2. Pending business rules (owner: product, with client): when nested trees use
+   "Yes - No Prompting Done" versus "Respondent says <entity>"; which child a
+   candidate answer takes (party or generic); and how the response
+   standardisation toggle ("use console options") exposes survey options under
+   "Mismatch" in the policy JSON, so the matching option can be prefilled. No
+   current export contains that toggle; a sample export is needed.
+3. Prompting detection: `detect_prompting` returns NO_PROMPTING_EVIDENCE (0.95)
+   whenever agent follow-up text is empty, including when it was lost upstream.
+   On the current sample it called "no prompting" for 2 of 2 human-labelled
+   prompting cases among flat-tree tags. Fix before enabling
+   `--prompting-aware-answers` by default.
+4. Expand manually reviewed evaluation beyond this one sample before changing
    thresholds.
 
-Remaining gaps: dynamic choices, configurable tag mapping, batch prompting paths,
-broad evaluation and production integration. Timestamp
+Remaining gaps: dynamic choices, configurable tag mapping, prompted-party
+selection, introduction completeness, broad evaluation and production integration. Timestamp
 absence limits chronology; rich dicts have weaker contracts than core models.
 There is no deployment/locked runtime or demonstrated production accuracy.

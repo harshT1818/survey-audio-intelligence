@@ -99,9 +99,11 @@ def audit_question(
             canonical_options=canonical_options,
         )
 
+        # A missing path means that prompting outcome is left
+        # for review rather than mapped.
         use_prompting_mapping = (
             no_prompting_path is not None
-            and prompting_path is not None
+            or prompting_path is not None
         )
 
         # -----------------------------------------------------
@@ -220,6 +222,11 @@ def audit_question(
                 disposition_text=(
                     question_suggestion.disposition_text
                 ),
+                comments_required=getattr(
+                    question_suggestion,
+                    "comments_required",
+                    False,
+                ),
             )
             if question_suggestion
             else None
@@ -281,6 +288,11 @@ def audit_question(
                         "disposition_path",
                         [],
                     )
+                ),
+                comments_required=getattr(
+                    answer_suggestion,
+                    "comments_required",
+                    False,
                 ),
             )
             if answer_suggestion

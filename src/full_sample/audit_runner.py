@@ -3,6 +3,7 @@
 from collections import Counter
 from typing import Any
 
+from src.audit_policy.answer_tree import answer_prompting_paths
 from src.audit_policy.models import AuditProjectPolicy
 from src.domain.models import SurveyQuestion
 from src.full_sample.audit_adapter import run_full_question_audit
@@ -47,7 +48,12 @@ def evaluate_full_sample(
     *, dialogues: list[dict[str, Any]], windows: list[dict[str, Any]],
     survey_definition: dict[str, Any], policy: AuditProjectPolicy,
     human_audit: dict[str, Any], tags: list[str] | None = None,
+    prompting_aware_answers: bool = False,
 ) -> dict[str, Any]:
+    # prompting_aware_answers enables "Yes - No Prompting Done" on flat
+    # prompting trees. Off by default: the prompting detector reports
+    # no prompting whenever follow-up speech is absent, including when
+    # it was lost upstream, and missed human-labelled prompting.
     dialogue_map = index_by_tag(dialogues)
     window_map = index_by_tag(windows)
     survey_map = index_by_tag(survey_definition["questions"])
@@ -73,6 +79,9 @@ def evaluate_full_sample(
         window = window_map[tag]
         # The survey definition supplies the authoritative question wording.
         dialogue = {**dialogue_map[tag], "question_text": definition["question_text"]}
+        no_prompting_path, prompting_path = (
+            answer_prompting_paths(tag_policy.answer_validation.dispositions)
+            if prompting_aware_answers else (None, None))
         result = run_full_question_audit(
             question=SurveyQuestion(
                 key=tag, text_hi=definition["question_text"],
@@ -82,6 +91,7 @@ def evaluate_full_sample(
             rich_dialogue=dialogue, question_window=window,
             canonical_options=canonical_options_from_question(definition),
             tag_policy=tag_policy,
+            no_prompting_path=no_prompting_path, prompting_path=prompting_path,
         )
         human = human_audit.get(tag) or {}
         rows.append({

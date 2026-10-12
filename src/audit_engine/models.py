@@ -16,6 +16,9 @@ class SuggestedDisposition(BaseModel):
     disposition_path: list[str] = Field(
         default_factory=list
     )
+    # The policy requires an auditor comment for this node, so it
+    # can never be filled automatically.
+    comments_required: bool = False
 
 
 class QuestionAuditResult(BaseModel):

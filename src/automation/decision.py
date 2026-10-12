@@ -30,6 +30,16 @@ def _question_proposal(
     ):
         return None
 
+    if audit.question_disposition.comments_required:
+        return DispositionProposal(
+            side="question",
+            disposition=(
+                audit.question_disposition
+            ),
+            action="PREFILL",
+            reason=COMMENT_REQUIRED_REASON,
+        )
+
     return DispositionProposal(
         side="question",
         disposition=(
@@ -42,6 +52,30 @@ def _question_proposal(
             "Audit CRM disposition."
         ),
     )
+
+
+COMMENT_REQUIRED_REASON = (
+    "The configured disposition requires an "
+    "auditor comment, so it can only be prefilled."
+)
+
+PROMPTING_PREFILL_REASON = (
+    "The answer disposition depends on prompting "
+    "detection, which is not yet benchmarked, so it "
+    "can only be prefilled."
+)
+
+
+def _answer_auto_fill_block(
+    audit: QuestionAuditResult,
+) -> str | None:
+    if audit.answer_disposition.comments_required:
+        return COMMENT_REQUIRED_REASON
+
+    if audit.prompting_status is not None:
+        return PROMPTING_PREFILL_REASON
+
+    return None
 
 
 def _answer_options_agree(
@@ -87,6 +121,20 @@ def _answer_proposal(
         evidence.automation_status
         == "AUTO_FILL_CANDIDATE"
     ):
+        block_reason = _answer_auto_fill_block(
+            audit
+        )
+
+        if block_reason is not None:
+            return DispositionProposal(
+                side="answer",
+                disposition=(
+                    audit.answer_disposition
+                ),
+                action="PREFILL",
+                reason=block_reason,
+            )
+
         if (
             evidence.review_required
             or audit.prompting_status

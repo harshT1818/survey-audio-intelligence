@@ -92,7 +92,9 @@ def test_full_strong_evidence_auto_fills():
     ) == 2
 
 
-def test_prompted_answer_can_auto_fill_correct_disposition():
+def test_prompted_answer_prefills_correct_disposition():
+    # Prompting-aware answers are capped at PREFILL until prompting
+    # detection is benchmarked; the proposed disposition is unchanged.
     audit = QuestionAuditResult(
         question_key=(
             "state_govt_change"
@@ -143,7 +145,7 @@ def test_prompted_answer_can_auto_fill_correct_disposition():
         corroborated,
     )
 
-    assert result.action == "AUTO_FILL"
+    assert result.action == "PREFILL"
 
     answer = [
         proposal
@@ -158,6 +160,9 @@ def test_prompted_answer_can_auto_fill_correct_disposition():
         .disposition_text
         == "Yes - Prompting Done"
     )
+
+    assert answer.action == "PREFILL"
+    assert "prompting detection" in answer.reason
 
 
 def test_moderate_answer_is_prefilled():

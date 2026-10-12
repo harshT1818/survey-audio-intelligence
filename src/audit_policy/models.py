@@ -24,6 +24,10 @@ class AuditTagPolicy(BaseModel):
     order: int
     tag_type: str
 
+    # Audit CRM `desposition_type`: multi_level_dropdown,
+    # multi_select_dropdown, no_validation or textbox.
+    disposition_type: str | None = None
+
     question_tag_id: int | None = None
 
     question_validation: ValidationPolicy

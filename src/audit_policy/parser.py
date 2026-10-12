@@ -71,6 +71,7 @@ def _parse_tag(raw_tag: dict[str, Any]) -> AuditTagPolicy:
         active=bool(raw_tag.get("is_active", False)),
         order=int(raw_tag.get("order", 0)),
         tag_type=raw_tag.get("tag_type", ""),
+        disposition_type=raw_tag.get("desposition_type"),
         question_tag_id=raw_tag.get("question_tag_id"),
         question_validation=question_validation,
         answer_validation=answer_validation,

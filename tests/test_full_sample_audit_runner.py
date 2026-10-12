@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from src.audit_policy.models import AuditProjectPolicy
+from src.audit_policy.models import AuditProjectPolicy, DispositionNode
 from src.full_sample.audit_runner import compare_disposition, evaluate_full_sample
 from test_audit_adapter import QUESTION_TEXT, make_dialogue, make_policy, make_turn, make_window
 
@@ -69,6 +69,34 @@ def test_duplicate_tags_and_wrong_project_are_rejected():
     data["policy"].project_code = "wrong"
     with pytest.raises(ValueError, match="scope mismatch"):
         evaluate_full_sample(**data)
+
+
+def flat_prompting_inputs():
+    data = inputs()
+    data["policy"].tags["state_govt_change"].answer_validation.dispositions = [
+        DispositionNode(id=3001, text="Yes - No Prompting Done"),
+        DispositionNode(id=3002, text="Mismatch", comments_required=True),
+        DispositionNode(id=3003, text="Prompting -Party A"),
+    ]
+    data["human_audit"] = {}
+    return data
+
+
+def test_flat_prompting_mapping_is_off_by_default():
+    row = evaluate_full_sample(**flat_prompting_inputs())["questions"][0]
+    assert row["audit"]["prompting_status"] is None
+    assert row["audit"]["answer_disposition"]["disposition_id"] is None
+
+
+def test_opt_in_flat_prompting_mapping_is_prefill_only():
+    row = evaluate_full_sample(
+        **flat_prompting_inputs(), prompting_aware_answers=True,
+    )["questions"][0]
+    assert row["audit"]["prompting_status"] == "NO_PROMPTING_EVIDENCE"
+    assert row["audit"]["answer_disposition"]["disposition_text"] == "Yes - No Prompting Done"
+    answer = [p for p in row["automation"]["proposals"] if p["side"] == "answer"][0]
+    assert answer["action"] == "PREFILL"
+    assert row["automation"]["action"] != "AUTO_FILL"
 
 
 def test_inactive_policy_is_not_executed():

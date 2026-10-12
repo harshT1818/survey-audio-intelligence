@@ -10,6 +10,11 @@ def main():
     parser = argparse.ArgumentParser(description="Evaluate prepared full-sample audit evidence offline.")
     parser.add_argument("--sample-dir", type=Path, required=True)
     parser.add_argument("--tags", nargs="+")
+    parser.add_argument(
+        "--prompting-aware-answers", action="store_true",
+        help="Experimental: map unprompted matches on flat prompting trees "
+             "to 'Yes - No Prompting Done' (prefill only).",
+    )
     args = parser.parse_args()
 
     def load(name):
@@ -27,6 +32,7 @@ def main():
         windows=load("question_asr.json"),
         survey_definition=load("survey_definition.json"),
         policy=policy, human_audit=load("human_audit.json"), tags=args.tags,
+        prompting_aware_answers=args.prompting_aware_answers,
     )
     output = args.sample_dir / "full_sample_audit.json"
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
