@@ -63,7 +63,9 @@ automatic result to prefill.
 
 The core engine extracts agent question text, initial respondent response,
 intervening agent follow-up, and final respondent response. Question validation
-uses fuzzy similarity; answer resolution uses canonical choices. Prompting-aware
+uses fuzzy similarity; answer resolution uses canonical choices and, for
+respondent text, requires the utterance as a whole to match an option, so an
+option word inside a longer statement is left for review. Prompting-aware
 mapping requires explicit policy paths. Confidence/similarity values are scores,
 not calibrated probabilities.
 

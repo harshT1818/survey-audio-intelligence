@@ -168,6 +168,7 @@ def evaluate_answer_evidence(
         raw_text=raw_text,
         options=options,
         stored_option=stored_option,
+        require_whole_answer=True,
     )
 
     if resolution.status == "UNCERTAIN":

@@ -133,6 +133,10 @@ are comparison references, not input evidence for resolving the spoken answer.
   safe dialogue; material upstream review can downgrade AUTO_FILL to PREFILL.
 - Initial response/follow-up informs prompting; final respondent response informs
   answer resolution. Agent-only mentions are not direct respondent evidence.
+- Respondent answers resolve only as a whole answer (`require_whole_answer`
+  in the core resolver and evidence gate): an option word inside a longer
+  statement ("नहीं अब बदलाव तो होना चाहिए") stays UNCERTAIN, because WRatio
+  scores substrings at ~0.9. Agent contextual matching keeps substring matching.
 - Anchor similarity and question validation use different scoring/normalization.
   Finding an anchor does not validate the question. Fuzzy scores are not probabilities.
 - Only static, resolution-ready catalogs provide options in the full-sample path.
@@ -182,16 +186,13 @@ Use `python -X utf8 -m ...` for redirected Hindi/Unicode output on Windows.
 
 ## Next work and limitations
 
-1. Corroboration safety: a leading discourse "नहीं" in a respondent statement
-   that affirms the question ("no, change should happen") resolved as a STRONG
-   "No" mismatch marked AUTO_FILL_CANDIDATE, contradicting the human label.
-   Add a synthetic regression and stop such turns being STRONG evidence.
-2. Answer resolution produced no suggestions on any of 25 tags. Investigate per
+1. Answer resolution produced no suggestions on any of 25 tags. Investigate per
    tag (statement answers to yes/no questions, party/candidate aliases, scale
-   answers, agent-only dialogue) without lowering thresholds.
-3. Prompting paths are not configured in the batch runner although human labels
+   answers, agent-only dialogue) without lowering thresholds. Statement
+   answers now stay UNCERTAIN by design (see whole-answer invariant).
+2. Prompting paths are not configured in the batch runner although human labels
    include prompting dispositions.
-4. Expand manually reviewed evaluation beyond this one sample before changing
+3. Expand manually reviewed evaluation beyond this one sample before changing
    thresholds.
 
 Remaining gaps: dynamic choices, configurable tag mapping, batch prompting paths,

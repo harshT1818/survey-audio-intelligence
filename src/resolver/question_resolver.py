@@ -19,4 +19,5 @@ def resolve_question_answer(
         raw_text=transcript_text,
         options=canonical_options,
         stored_option=stored_option,
+        require_whole_answer=True,
     )
