@@ -1,4 +1,4 @@
-from pathlib import Path
+from pathlib import PureWindowsPath
 from typing import Any
 
 
@@ -19,7 +19,9 @@ def basename(
     if not value:
         return None
 
-    return Path(value).name
+    # Manifests written on Windows store backslash paths;
+    # PureWindowsPath splits both separators on any OS.
+    return PureWindowsPath(value).name
 
 
 def interval_overlap_sec(
