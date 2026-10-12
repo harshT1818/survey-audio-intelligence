@@ -408,3 +408,17 @@ def build_question_asr_records(
         )
 
     return records
+
+def mark_asr_not_run(
+    records: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Label windows built without question-level ASR.
+
+    Timing, stored answers and overlap flags stay valid; only the
+    window transcript is absent. NOT_RUN keeps that distinct from
+    ASR that ran and heard nothing (EMPTY).
+    """
+    return [
+        {**record, "asr_status": "NOT_RUN"}
+        for record in records
+    ]

@@ -22,6 +22,11 @@ then merged, giving clean dialogue for all 25 windows. Audit: 3 PREFILL (questio
 side only, all matching the human label), 22 HUMAN_REVIEW, no answer suggestions.
 These are single-sample observations, not accuracy claims. No respondent identifier needs to be copied into tracked documentation.
 
+Expansion (2026-10-13): six more audited interviews from the same project
+(about 47 minutes, mixing P3-rejected and prompting cases) are prepared to the
+Colab boundary with Sortformer as their only diarization; question-level ASR is
+skipped (`--without-asr`). Each still needs its survey definition export.
+
 ## Complete source-package map
 
 Paths are relative to `src/`. Package `__init__.py` files provide structure.
@@ -85,9 +90,10 @@ some defaults cover only experimental tags and some demo paths are hard-coded.
 
 | Stage | Files in `scripts/` |
 | --- | --- |
-| Prepare | `prepare_real_sample.py`, `prepare_real_survey_definition.py` |
+| Prepare | `split_audit_export.py` (audit_crm_responses export → per-response `audit_row.csv`; super-audit is primary, regular kept as `audit_row_regular.csv`), `prepare_real_sample.py`, `prepare_real_survey_definition.py` |
 | Question audio | `export_real_question_windows.py`, `prepare_real_question_asr_batch.py` |
-| ASR assembly | `inspect_asr_manifest.py`, `build_real_question_asr.py` |
+| ASR assembly | `inspect_asr_manifest.py`, `build_real_question_asr.py` (`--without-asr` builds windows from timing/overlap only, `asr_status` NOT_RUN; window transcripts are informational) |
+| Colab batching | `colab_batch.py` (`pack-audio`/`unpack-diarization` for Sortformer, `pack-turns`/`unpack-asr` for Vaani; clips prefixed `<response_id>__`; never replaces different files without `--overwrite`) |
 | Diarization/refinement | `run_diarization.py`, `export_diarization_clips.py`, `refine_problem_segments.py`, `compare_diarization.py` (`--checkpoints` + one or more diarization JSONs) |
 | Role evidence | `build_real_question_dialogue_segments.py`, `infer_real_speaker_roles.py` |
 | Turn export | `export_real_prompting_turns.py` (custom tags, output directory and manifest supported) |
@@ -117,6 +123,8 @@ script refuses missing, unexpected or duplicate ASR rows unless
 | `prompting_benchmark*.json`, `prompting_evidence_diagnostics.json` | Prompting experiments/diagnostics |
 | `full_sample_audit.json` | Audit, corroboration, automation, trace and human comparison |
 | `full_sample_pending_turn_manifest.json`, `full_sample_pending_turn_audio/` | Extension turn batch and clips |
+| `audit_row.csv`, `audit_row_regular.csv` | One audit_crm_responses row (no header, SELECT * order); regular audit kept when a super-audit exists |
+| `data/private/exports/`, `data/private/colab/` | Raw portal/database exports; Colab batch zips and manifests |
 | `full_sample_pending_turn_asr_results.json`, `full_sample_pending_turn_asr_report.json` | Colab Vaani results and coverage/runtime report |
 | `prompting_dialogue_clean.before_merge.json` | Clean dialogue as it was before the merge |
 | `full_sample_audit_diagnosis.md`, `full_sample_pending_export.log` | Private diagnosis and export log |

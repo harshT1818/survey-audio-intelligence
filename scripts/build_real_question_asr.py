@@ -4,6 +4,7 @@ from pathlib import Path
 
 from src.full_sample.question_asr import (
     build_question_asr_records,
+    mark_asr_not_run,
 )
 
 
@@ -47,6 +48,15 @@ def main():
         required=True,
     )
 
+    parser.add_argument(
+        "--without-asr",
+        action="store_true",
+        help=(
+            "Build windows from timing and overlap only; "
+            "asr_status is NOT_RUN and transcripts are empty."
+        ),
+    )
+
     args = parser.parse_args()
 
     sample_dir = (
@@ -64,9 +74,13 @@ def main():
         / "question_asr_batch_manifest.json"
     )
 
-    asr_results = load_json(
-        sample_dir
-        / "question_asr_chunk_results.json"
+    asr_results = (
+        []
+        if args.without_asr
+        else load_json(
+            sample_dir
+            / "question_asr_chunk_results.json"
+        )
     )
 
     records = (
@@ -76,6 +90,11 @@ def main():
             asr_results=asr_results,
         )
     )
+
+    if args.without_asr:
+        records = mark_asr_not_run(
+            records
+        )
 
     output_path = (
         sample_dir

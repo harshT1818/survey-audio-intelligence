@@ -1,5 +1,6 @@
 from src.full_sample.question_asr import (
     build_question_asr_records,
+    mark_asr_not_run,
     merge_text_parts,
 )
 
@@ -187,3 +188,43 @@ def test_missing_asr_is_partial():
             "001_test_chunk_02.wav"
         ]
     )
+
+
+def test_windows_without_asr_keep_timing_and_overlap():
+    questions = [
+        {
+            "index": 1,
+            "tag": "age",
+            "question_text": "आपकी उम्र क्या है",
+            "stored_response": "55",
+            "english_value": [],
+            "hindi_value": [],
+            "start_sec": 10.0,
+            "end_sec": 14.0,
+            "duration_sec": 4.0,
+        }
+    ]
+    batch = [
+        {
+            "question_index": 1,
+            "chunk_index": 1,
+            "audio_file": "001_age_chunk_01.wav",
+            "absolute_start_sec": 10.0,
+            "absolute_end_sec": 14.0,
+            "overlap_review_required": True,
+        }
+    ]
+
+    records = mark_asr_not_run(
+        build_question_asr_records(
+            questions=questions,
+            batch_manifest=batch,
+            asr_results=[],
+        )
+    )
+
+    assert records[0]["asr_status"] == "NOT_RUN"
+    assert records[0]["transcript"] == ""
+    assert records[0]["stored_response"] == "55"
+    assert records[0]["start_sec"] == 10.0
+    assert records[0]["overlap_review_required"] is True
