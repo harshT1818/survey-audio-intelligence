@@ -1,44 +1,43 @@
 # Survey Audio Intelligence
 
-Experimental AI-assisted survey audio auditing pipeline.
+Offline prototype for AI-assisted P3 survey audio auditing. It turns interview
+audio and survey context into question-level evidence, configured disposition
+suggestions, and conservative human-review decisions. Final P3 validity remains
+with existing Audit CRM business logic.
 
-The project explores how survey interview audio can be converted into structured evidence for Audit CRM, with the long-term goal of:
+## Documentation
 
-- reducing human P3 audit effort
-- pre-filling high-confidence audit dispositions
-- routing uncertain cases to human auditors
-- evaluating whether a highly reliable subset of samples can eventually be auto-cleared
+- [Business goals](docs/BUSINESS_GOALS.md)
+- [Technical architecture](docs/TECH_ARCHITECTURE.md)
+- [AI agent context and repository map](docs/AGENT_CONTEXT.md)
+- [Agent working rules](AGENTS.md)
+- [Full-sample audit runner](docs/full_sample_audit.md)
+- [ASR baseline observations](experiments/asr_baseline/README.md)
 
-## Current Scope
+## Implemented
 
-The current foundation supports:
+Audio normalization and clip preparation; ASR manifests/chunk assembly and Whisper
+baseline; diarization and role inference; static survey choice catalogs; question,
+answer and prompting evaluation; nested policy mapping; evidence corroboration;
+speaker-safe audit adaptation; and offline per-question batch reports.
 
-- validated survey-audit request schemas
-- Audit CRM project policy parsing
-- nested audit disposition trees
-- question and answer validation configuration
-- console/local audit-tag distinction
-- filtering inactive audit tags
-- synthetic test fixtures
-- CLI project/request validation
+Vaani transcription uses a separate experimental workflow. There is no production
+service, CRM writeback, or sample auto-clear implementation.
 
-No transcription or automated audit decisions are implemented yet.
+## Verify and run
 
-## Planned Pipeline
+Use the existing Python environment from the repository root:
 
-```text
-Survey Audio
-    ↓
-Question Segmentation
-    ↓
-Hindi ASR
-    ↓
-Speaker Analysis
-    ↓
-Answer Resolution
-    ↓
-Question / Answer Validation
-    ↓
-Audit Disposition Suggestions
-    ↓
-Human Review / Future Auto-Clear Eligibility
+```powershell
+python -m pytest -q
+python -m src.main --request samples/sample_request.json --policy configs/sample_audit_project.json
+python -m scripts.evaluate_full_sample_audit --sample-dir data/private/r2/<response-id>
+```
+
+The full-sample command requires prepared private artifacts; see its
+[usage guide](docs/full_sample_audit.md). `src.main` validates foundation inputs
+only. Python requirements are unpinned; FFmpeg and the optional ML runtime need
+separate setup. Consult the architecture before changing packages.
+
+Real audio, respondent data, transcripts, credentials and generated reports must
+remain outside version control. Use synthetic fixtures for automated tests.
