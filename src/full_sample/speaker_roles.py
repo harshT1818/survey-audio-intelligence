@@ -2,6 +2,11 @@ from collections import defaultdict
 from typing import Any
 
 
+# The respondent must have at least this many times the core speech
+# of the next non-interviewer speaker.
+RESPONDENT_DOMINANCE_RATIO = 3.0
+
+
 def _speaker_core_time(
     question: dict[str, Any],
 ) -> dict[str, float]:
@@ -103,11 +108,11 @@ def infer_speaker_roles(
         speaker_totals.keys()
     )
 
-    if len(speakers) != 2:
+    if len(speakers) < 2:
         return {
             "status": "UNRESOLVED",
             "reason": (
-                "Expected exactly two global "
+                "Expected at least two global "
                 "diarization speakers."
             ),
             "speaker_totals_sec": (
@@ -238,11 +243,73 @@ def infer_speaker_roles(
             "evidence": evidence,
         }
 
-    respondent_speaker = next(
-        speaker
-        for speaker in speakers
-        if speaker != dominant_speaker
+    # Extra speakers (family members, bystanders) are expected in
+    # field interviews. The respondent must clearly out-talk every
+    # other non-interviewer speaker; extra speakers stay unknown.
+    candidates = sorted(
+        (
+            (speaker, speaker_totals[speaker])
+            for speaker in speakers
+            if speaker != dominant_speaker
+        ),
+        key=lambda item: (
+            -item[1],
+            item[0],
+        ),
     )
+
+    respondent_speaker = candidates[0][0]
+    extra_speakers = [
+        speaker
+        for speaker, _ in candidates[1:]
+    ]
+
+    if extra_speakers:
+        runner_up_duration = candidates[1][1]
+
+        evidence.append(
+            {
+                "type": "additional_speakers",
+                "speaker_ids": extra_speakers,
+                "respondent_candidate": (
+                    respondent_speaker
+                ),
+                "respondent_core_speech_sec": round(
+                    candidates[0][1],
+                    3,
+                ),
+                "largest_extra_core_speech_sec": round(
+                    runner_up_duration,
+                    3,
+                ),
+                "interpretation": (
+                    "Additional speakers are kept "
+                    "with an unknown role."
+                ),
+            }
+        )
+
+        if (
+            runner_up_duration > 0
+            and (
+                candidates[0][1]
+                / runner_up_duration
+            )
+            < RESPONDENT_DOMINANCE_RATIO
+        ):
+            return {
+                "status": "UNRESOLVED",
+                "reason": (
+                    "No single non-interviewer "
+                    "speaker is dominant enough "
+                    "to be the respondent."
+                ),
+                "speaker_totals_sec": (
+                    speaker_totals
+                ),
+                "roles": {},
+                "evidence": evidence,
+            }
 
     respondent_support_tags = []
 
@@ -316,6 +383,12 @@ def infer_speaker_roles(
             "confidence": confidence,
         },
     }
+
+    for speaker in extra_speakers:
+        roles[speaker] = {
+            "role": "unknown",
+            "confidence": "UNRESOLVED",
+        }
 
     return {
         "status": "RESOLVED",

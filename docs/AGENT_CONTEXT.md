@@ -64,7 +64,7 @@ All files below are in `src/full_sample/`.
 | `survey_definition.py` | CSV/TSV/encoding handling, grouped choices, metadata and dynamic catalog readiness |
 | `survey_options.py` | Static canonical labels/aliases; avoid shared party aliases for candidate choices |
 | `dialogue_segments.py` | Intersect question windows with speaker segments and context |
-| `speaker_roles.py` | Full-sample role inference from question/core speech statistics; distinct from `src/speaker_roles/` |
+| `speaker_roles.py` | Full-sample role inference from question/core speech statistics; distinct from `src/speaker_roles/`. Agent = introduction-dominant speaker; respondent = non-agent speaker with ≥3× the next one's speech; further speakers `unknown` |
 | `speaker_turns.py` | Merge segments, attach roles, mark exportable turns |
 | `speaker_safe_export.py` | Constrain padding against other speakers; retain genuine raw overlap |
 | `prompting_dialogue.py` | Join manifest to ASR results, retaining source/status metadata |
@@ -216,6 +216,12 @@ Use `python -X utf8 -m ...` for redirected Hindi/Unicode output on Windows.
      Experiment: `notebooks/sortformer_diarization.ipynb` (Colab, NVIDIA
      streaming Sortformer) writes `interview_16k_mono_diarization_sortformer.json`
      for `compare_diarization`. Six checkpoints are a smoke test, not a DER.
+     Sortformer passed 6 of 6 (pyannote 2 of 6) and found two bystander
+     speakers. A side-by-side run lives in private
+     `data/private/r2/<response-id>__sortformer/` (copied base inputs, Sortformer
+     diarization, clean-named turn export: 224 clips, 110 respondent vs 55
+     with pyannote). It awaits Vaani ASR, then the clean dialogue builder and
+     audit runner, to compare outcomes with the pyannote run.
      The existing pyannote JSON for this sample carries a stale `audio_id`
      (`manual_dialogue_test_01`); regenerate rather than trust that field.
    - Some windows start after the question was spoken (no anchor found).

@@ -139,6 +139,56 @@ def test_unresolved_without_intro():
     )
 
 
+def with_extra_speaker(question, speaker_id, seconds):
+    question["speaker_stats"].append(
+        {
+            "speaker_id": speaker_id,
+            "core_speech_sec": seconds,
+        }
+    )
+    return question
+
+
+def test_extra_speakers_are_kept_unknown():
+    questions = [
+        make_question("introduction", 10.0, 0.0),
+        with_extra_speaker(
+            make_question("phone_no", 5.0, 4.0),
+            "SPEAKER_02",
+            1.0,
+        ),
+        make_question("state_govt_change", 4.0, 3.0),
+        make_question("cm_choice", 4.0, 3.0),
+    ]
+
+    result = infer_speaker_roles(questions)
+
+    assert result["status"] == "RESOLVED"
+    assert result["roles"]["SPEAKER_00"]["role"] == "agent"
+    assert result["roles"]["SPEAKER_01"]["role"] == "respondent"
+    assert result["roles"]["SPEAKER_02"]["role"] == "unknown"
+    assert any(
+        item["type"] == "additional_speakers"
+        for item in result["evidence"]
+    )
+
+
+def test_unresolved_if_no_respondent_dominates_extra_speaker():
+    questions = [
+        make_question("introduction", 10.0, 0.0),
+        with_extra_speaker(
+            make_question("phone_no", 5.0, 4.0),
+            "SPEAKER_02",
+            3.0,
+        ),
+    ]
+
+    result = infer_speaker_roles(questions)
+
+    assert result["status"] == "UNRESOLVED"
+    assert result["roles"] == {}
+
+
 def test_unresolved_if_intro_is_ambiguous():
     questions = [
         make_question(
