@@ -203,8 +203,14 @@ Use `python -X utf8 -m ...` for redirected Hindi/Unicode output on Windows.
    - Final respondent text was empty for 14 tags (no anchor, no safe respondent
      turn, or gender not asked aloud) and a back-channel ("हाँ हाँ", "मतलब",
      "कौन से") for most others; the real answer is often an earlier turn.
-   - Role errors: some respondent answers are attributed to the agent (for
-     example a CM-choice answer), so they never reach answer resolution.
+   - Role errors are the main bottleneck: after anchoring, most real answers
+     sit in SPEAKER_00 (agent) turns (age, major problems, party, CM choice,
+     past candidate, MLA satisfaction), sometimes merged with the question in
+     one turn. Diarization gave SPEAKER_00 364 s vs SPEAKER_01 71 s. Better
+     final-answer turn selection would not change any result on this sample;
+     the remaining respondent turns are back-channels or statements. Confirm by
+     listening before choosing a fix (re-segmentation/speaker verification of
+     short agent segments, or comparing another diarizer).
    - Some windows start after the question was spoken (no anchor found).
    - Numeric/free-text tags (age, phone, dissatisfaction reason) and dynamic
      choices have no resolver. Statement and verb-echo answers ("जानते हैं")
