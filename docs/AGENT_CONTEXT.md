@@ -37,6 +37,7 @@ Paths are relative to `src/`. Package `__init__.py` files provide structure.
 | `asr/models.py`, `manifest.py`, `chunking.py` | Transcript/chunk contracts, persistence, repeated-overlap removal and merging |
 | `asr/whisper_baseline.py` | Transformers Whisper Small Hindi comparison baseline |
 | `diarization/models.py`, `pyannote_runner.py`, `clip_export.py` | Speaker segments, direct PCM loading, Pyannote and speaker clip export |
+| `diarization/comparison.py` | Score diarization outputs against listened-to agent/respondent/mixed checkpoints |
 | `speaker_roles/models.py`, `rules.py` | Semantic/contextual role inference, mixed/unknown turns and diarization consistency |
 | `dialogue/models.py`, `question_window.py` | Speech turns and agent question/initial response/follow-up/final response extraction |
 | `resolver/models.py`, `option_parser.py`, `closed_set.py`, `question_resolver.py` | Canonical options, SurveyXpress parsing, spoken-answer matching and stored-answer comparison |
@@ -86,7 +87,7 @@ some defaults cover only experimental tags and some demo paths are hard-coded.
 | Prepare | `prepare_real_sample.py`, `prepare_real_survey_definition.py` |
 | Question audio | `export_real_question_windows.py`, `prepare_real_question_asr_batch.py` |
 | ASR assembly | `inspect_asr_manifest.py`, `build_real_question_asr.py` |
-| Diarization/refinement | `run_diarization.py`, `export_diarization_clips.py`, `refine_problem_segments.py` |
+| Diarization/refinement | `run_diarization.py`, `export_diarization_clips.py`, `refine_problem_segments.py`, `compare_diarization.py` (`--checkpoints` + one or more diarization JSONs) |
 | Role evidence | `build_real_question_dialogue_segments.py`, `infer_real_speaker_roles.py` |
 | Turn export | `export_real_prompting_turns.py` (custom tags, output directory and manifest supported) |
 | Dialogue assembly | `build_real_prompting_dialogue.py`, `build_real_prompting_dialogue_clean.py`, `merge_prompting_dialogue.py` (`--sample-dir`; builds a turn batch and merges it into the clean dialogue) |
@@ -208,9 +209,15 @@ Use `python -X utf8 -m ...` for redirected Hindi/Unicode output on Windows.
      past candidate, MLA satisfaction), sometimes merged with the question in
      one turn. Diarization gave SPEAKER_00 364 s vs SPEAKER_01 71 s. Better
      final-answer turn selection would not change any result on this sample;
-     the remaining respondent turns are back-channels or statements. Confirm by
-     listening before choosing a fix (re-segmentation/speaker verification of
-     short agent segments, or comparing another diarizer).
+     the remaining respondent turns are back-channels or statements. Listening
+     confirmed 4 of 6 checked answers are respondent speech labelled agent (one
+     more unclear). Private `diarization_checkpoints.json` records those
+     moments; pyannote community-1 passes 2 of 6 (only the agent ones).
+     Experiment: `notebooks/sortformer_diarization.ipynb` (Colab, NVIDIA
+     streaming Sortformer) writes `interview_16k_mono_diarization_sortformer.json`
+     for `compare_diarization`. Six checkpoints are a smoke test, not a DER.
+     The existing pyannote JSON for this sample carries a stale `audio_id`
+     (`manual_dialogue_test_01`); regenerate rather than trust that field.
    - Some windows start after the question was spoken (no anchor found).
    - Numeric/free-text tags (age, phone, dissatisfaction reason) and dynamic
      choices have no resolver. Statement and verb-echo answers ("जानते हैं")
