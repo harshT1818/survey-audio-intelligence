@@ -88,3 +88,37 @@ def test_directive_without_uncertain_respondent_is_uncertain():
     assert result.status == "UNCERTAIN"
 
     assert result.review_required is True
+
+def test_missing_respondent_answer_is_uncertain_not_no_prompting():
+    result = detect_prompting(
+        respondent_text="",
+        agent_followup_text="",
+        options=make_options(),
+    )
+
+    assert result.status == "UNCERTAIN"
+    assert result.review_required is True
+
+
+def test_no_followup_with_dropped_turns_is_uncertain():
+    result = detect_prompting(
+        respondent_text="हाँ",
+        agent_followup_text="",
+        options=make_options(),
+        evidence_complete=False,
+    )
+
+    assert result.status == "UNCERTAIN"
+    assert result.review_required is True
+    assert "dropped" in result.reason
+
+
+def test_followup_evidence_is_still_used_when_turns_were_dropped():
+    result = detect_prompting(
+        respondent_text="मुझे पता नहीं",
+        agent_followup_text="हाँ बोल दीजिए",
+        options=make_options(),
+        evidence_complete=False,
+    )
+
+    assert result.status == "PROMPTING_EVIDENCE"

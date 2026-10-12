@@ -99,6 +99,17 @@ def test_opt_in_flat_prompting_mapping_is_prefill_only():
     assert row["automation"]["action"] != "AUTO_FILL"
 
 
+def test_dropped_overlap_turn_blocks_no_prompting_suggestion():
+    data = flat_prompting_inputs()
+    data["dialogues"][0]["turns"].insert(1, make_turn(
+        3, "respondent", 12.1, 12.4, "कुछ", raw_overlap=True, raw_overlap_sec=0.3,
+    ))
+    row = evaluate_full_sample(**data, prompting_aware_answers=True)["questions"][0]
+
+    assert row["audit"]["prompting_status"] == "UNCERTAIN"
+    assert row["audit"]["answer_disposition"]["disposition_id"] is None
+
+
 def test_overlapping_window_withholds_answer_but_keeps_question():
     data = inputs()
     data["windows"][0]["overlap_review_required"] = True

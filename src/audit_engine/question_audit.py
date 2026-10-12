@@ -35,7 +35,11 @@ def audit_question(
     tag_policy: AuditTagPolicy,
     no_prompting_path: list[str] | None = None,
     prompting_path: list[str] | None = None,
+    prompting_evidence_complete: bool = True,
 ) -> QuestionAuditResult:
+    # prompting_evidence_complete is False when material turns were
+    # removed before this dialogue was built, so silence in the safe
+    # dialogue does not prove there was no prompting.
 
     reasons: list[str] = []
 
@@ -122,6 +126,9 @@ def audit_question(
                     dialogue_evidence.agent_followup_text
                 ),
                 options=canonical_options,
+                evidence_complete=(
+                    prompting_evidence_complete
+                ),
             )
 
             reasons.append(

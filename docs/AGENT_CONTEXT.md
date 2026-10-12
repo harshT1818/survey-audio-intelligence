@@ -260,11 +260,15 @@ Use `python -X utf8 -m ...` for redirected Hindi/Unicode output on Windows.
    standardisation toggle ("use console options") exposes survey options under
    "Mismatch" in the policy JSON, so the matching option can be prefilled. No
    current export contains that toggle; a sample export is needed.
-3. Prompting detection: `detect_prompting` returns NO_PROMPTING_EVIDENCE (0.95)
-   whenever agent follow-up text is empty, including when it was lost upstream.
-   On the current sample it called "no prompting" for 2 of 2 human-labelled
-   prompting cases among flat-tree tags. Fix before enabling
-   `--prompting-aware-answers` by default.
+3. Prompting detection: `detect_prompting` now returns UNCERTAIN instead of
+   "no prompting" when there is no respondent answer or when material turns
+   were dropped upstream (`evidence_complete`, from the adapter's
+   `material_for_review` rejections). On the current sample this removed both
+   wrong "no prompting" calls; the remaining ones (2 per run) agree with the
+   human labels, at the cost of more UNCERTAIN results. Still not covered:
+   prompting before the first respondent answer and agent speech after the
+   last respondent turn. Keep `--prompting-aware-answers` off by default until
+   more labelled interviews are checked.
 4. Expand manually reviewed evaluation beyond this one sample before changing
    thresholds.
 

@@ -769,6 +769,10 @@ def run_full_question_audit(
         prompting_path=(
             prompting_path
         ),
+        prompting_evidence_complete=not any(
+            item.material_for_review
+            for item in inputs.trace.rejected_turns
+        ),
     )
 
     corroboration = (
