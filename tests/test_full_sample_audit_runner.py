@@ -99,6 +99,23 @@ def test_opt_in_flat_prompting_mapping_is_prefill_only():
     assert row["automation"]["action"] != "AUTO_FILL"
 
 
+def test_overlapping_window_withholds_answer_but_keeps_question():
+    data = inputs()
+    data["windows"][0]["overlap_review_required"] = True
+    row = evaluate_full_sample(**data)["questions"][0]
+
+    sides = {p["side"]: p["action"] for p in row["automation"]["proposals"]}
+    assert sides == {"question": "PREFILL"}
+    assert "answer" in row["automation"]["unresolved_sides"]
+    assert row["automation"]["action"] == "PREFILL"
+    assert any("overlaps another question" in r for r in row["automation"]["reasons"])
+
+
+def test_window_without_overlap_flag_is_unchanged():
+    row = evaluate_full_sample(**inputs())["questions"][0]
+    assert {p["side"] for p in row["automation"]["proposals"]} == {"question", "answer"}
+
+
 def test_inactive_policy_is_not_executed():
     data = inputs()
     data["policy"].tags["state_govt_change"].active = False

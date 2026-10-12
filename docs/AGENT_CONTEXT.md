@@ -237,11 +237,17 @@ Use `python -X utf8 -m ...` for redirected Hindi/Unicode output on Windows.
      (age, prefill, matching the human label) and correct resolutions for
      party, MLA and LS party; none contradicted stored or human labels.
      Still unresolved by design: yes/no and scale meaning ("जानते हैं",
-     "संतुष्ट नहीं है") and garbled entities; planned LLM extraction behind a
-     flag once data sharing is approved.
-   - Cross-question leakage: a question's window can include the next
-     question's anchor and answer (an LS-party answer appeared as LS-candidate
-     evidence). Corroboration should stop at the next question's anchor.
+     "संतुष्ट नहीं है") and garbled entities. LLM extraction (prefill-only,
+     verified quotes) is designed but deferred: no budget for paid API use as
+     of 2026-10-13, although external LLM use was approved.
+   - Cross-question leakage: overlapping windows (`overlap_review_required`,
+     e.g. LS candidate fully containing LS party while the interviewer moved
+     back and forth) can hold another question's answer. Answer proposals are
+     now withheld for such windows (question side kept). Cutting evidence at
+     the next anchor would be wrong for interleaved dialogue (the real
+     "can't remember" came after the party question); per-turn ownership by
+     nearest matching agent question is deferred until more samples show
+     how common this is.
      The existing pyannote JSON for this sample carries a stale `audio_id`
      (`manual_dialogue_test_01`); regenerate rather than trust that field.
    - Some windows start after the question was spoken (no anchor found).

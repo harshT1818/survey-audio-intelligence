@@ -840,6 +840,22 @@ def run_full_question_audit(
             )
         )
 
+    #
+    # Overlapping question windows (the interviewer moved
+    # back and forth between questions) can hold another
+    # question's answer, so answer evidence here cannot be
+    # attributed safely. The question side is unaffected.
+    #
+    if question_window.get(
+        "overlap_review_required"
+    ):
+        automation = (
+            withhold_answer_proposals(
+                automation,
+                OVERLAPPING_WINDOW_REASON,
+            )
+        )
+
     return FullQuestionAuditResult(
         audit=audit,
         corroboration=(
@@ -847,4 +863,50 @@ def run_full_question_audit(
         ),
         automation=automation,
         trace=inputs.trace,
+    )
+
+
+OVERLAPPING_WINDOW_REASON = (
+    "Question window overlaps another question's "
+    "window, so answer evidence may belong to the "
+    "other question; answer proposals were withheld."
+)
+
+
+def withhold_answer_proposals(
+    automation: QuestionAutomationDecision,
+    reason: str,
+) -> QuestionAutomationDecision:
+    proposals = [
+        proposal
+        for proposal in automation.proposals
+        if proposal.side != "answer"
+    ]
+
+    unresolved = list(
+        automation.unresolved_sides
+    )
+
+    if "answer" not in unresolved:
+        unresolved.append("answer")
+
+    return QuestionAutomationDecision(
+        question_key=automation.question_key,
+        action=(
+            "PREFILL"
+            if proposals
+            else "HUMAN_REVIEW"
+        ),
+        proposals=[
+            proposal.model_copy(
+                update={"action": "PREFILL"}
+            )
+            for proposal in proposals
+        ],
+        unresolved_sides=unresolved,
+        review_required=True,
+        reasons=[
+            *automation.reasons,
+            reason,
+        ],
     )
