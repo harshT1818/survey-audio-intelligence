@@ -10,6 +10,39 @@ STRUCTURED_SUFFIX_PATTERN = re.compile(
 )
 
 
+# How respondents commonly say party names, keyed by party code with the
+# party's full Hindi name. Added only when the choice's own label is that
+# party name: "Person [Party]" choices must not resolve from a party
+# mention, because whether a respondent named the party or the candidate
+# matters to the audit.
+PARTY_SPOKEN_ALIASES = {
+    "BSP": ("बहुजन समाज पार्टी", ["बसपा", "बीएसपी", "बी एस पी"]),
+    "SP": ("समाजवादी पार्टी", ["सपा", "एसपी"]),
+    "BJP": ("भारतीय जनता पार्टी", ["भाजपा", "बीजेपी", "बी जे पी"]),
+    "RLD": ("राष्ट्रीय लोकदल", ["रालोद", "आरएलडी"]),
+    "AAP": ("आम आदमी पार्टी", ["आप पार्टी"]),
+}
+
+
+def party_spoken_aliases(
+    party: str | None,
+    hindi_label: str | None,
+) -> list[str]:
+    entry = PARTY_SPOKEN_ALIASES.get(
+        normalize_text(party).upper()
+    )
+
+    if entry is None:
+        return []
+
+    full_name, aliases = entry
+
+    if normalize_text(hindi_label) != normalize_text(full_name):
+        return []
+
+    return aliases
+
+
 def clean_text(
     value: Any,
 ) -> str | None:
@@ -236,6 +269,11 @@ def choice_to_canonical_option(
                 *aliases,
                 party,
                 dl,
+                *party_spoken_aliases(
+                    party,
+                    primary_label(hindi)
+                    or primary_label(option_text),
+                ),
             ]
         )
 

@@ -41,6 +41,7 @@ Paths are relative to `src/`. Package `__init__.py` files provide structure.
 | `speaker_roles/models.py`, `rules.py` | Semantic/contextual role inference, mixed/unknown turns and diarization consistency |
 | `dialogue/models.py`, `question_window.py` | Speech turns and agent question/initial response/follow-up/final response extraction |
 | `resolver/models.py`, `option_parser.py`, `closed_set.py`, `question_resolver.py` | Canonical options, SurveyXpress parsing, spoken-answer matching and stored-answer comparison |
+| `resolver/respondent_answer.py` | Respondent answers: whole-answer match, then unique name mention (consonant skeleton, negation/alternative guards), then small Hindi numbers; rule results are prefill strength (0.80) |
 | `question_validation/models.py`, `fuzzy.py` | Question-text validation by fuzzy similarity |
 | `prompting/models.py`, `rules.py` | Rule-based prompting evidence |
 | `audit_policy/models.py`, `parser.py` | Project/tag policy and nested dispositions; external key is spelled `desposition` |
@@ -146,6 +147,13 @@ are comparison references, not input evidence for resolving the spoken answer.
   in the core resolver and evidence gate): an option word inside a longer
   statement ("नहीं अब बदलाव तो होना चाहिए") stays UNCERTAIN, because WRatio
   scores substrings at ~0.9. Agent contextual matching keeps substring matching.
+  After that, `resolve_respondent_answer` may resolve a statement only through
+  a word unique to one option (never honorifics or shared surnames), with no
+  negation or "या" alternatives in the turn, or a single spoken number when the
+  stored value is ≤120 (never phone numbers). These cap at prefill strength.
+- Spoken party aliases (बसपा, सपा, भाजपा…) apply only to choices whose label
+  is the party name, never to "Person [Party]" choices: whether the respondent
+  named the party or the candidate matters to the audit.
 - Anchor similarity and question validation use different scoring/normalization.
   Finding an anchor does not validate the question. Fuzzy scores are not probabilities.
 - Only static, resolution-ready catalogs provide options in the full-sample path.
@@ -220,8 +228,20 @@ Use `python -X utf8 -m ...` for redirected Hindi/Unicode output on Windows.
      speakers. A side-by-side run lives in private
      `data/private/r2/<response-id>__sortformer/` (copied base inputs, Sortformer
      diarization, clean-named turn export: 224 clips, 110 respondent vs 55
-     with pyannote). It awaits Vaani ASR, then the clean dialogue builder and
-     audit runner, to compare outcomes with the pyannote run.
+     with pyannote). Audit result (2026-10-13): 4 PREFILL / 21 review (was
+     3 / 22), still no answer suggestions, but the final respondent text is now
+     the real answer for about 9 tags (age, party, MLA, past vote, awareness,
+     MLA satisfaction, CM choice). Two interviewer-style option lists
+     ("या तो X हो या Y") are labelled respondent; listen before adopting.
+     Rule-based respondent resolution then gave the first answer suggestion
+     (age, prefill, matching the human label) and correct resolutions for
+     party, MLA and LS party; none contradicted stored or human labels.
+     Still unresolved by design: yes/no and scale meaning ("जानते हैं",
+     "संतुष्ट नहीं है") and garbled entities; planned LLM extraction behind a
+     flag once data sharing is approved.
+   - Cross-question leakage: a question's window can include the next
+     question's anchor and answer (an LS-party answer appeared as LS-candidate
+     evidence). Corroboration should stop at the next question's anchor.
      The existing pyannote JSON for this sample carries a stale `audio_id`
      (`manual_dialogue_test_01`); regenerate rather than trust that field.
    - Some windows start after the question was spoken (no anchor found).

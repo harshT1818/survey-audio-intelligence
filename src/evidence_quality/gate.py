@@ -4,11 +4,11 @@ import unicodedata
 from src.evidence_quality.models import (
     EvidenceQualityResult,
 )
-from src.resolver.closed_set import (
-    resolve_closed_set_answer,
-)
 from src.resolver.models import (
     CanonicalOption,
+)
+from src.resolver.respondent_answer import (
+    resolve_respondent_answer,
 )
 
 
@@ -164,11 +164,10 @@ def evaluate_answer_evidence(
             ],
         )
 
-    resolution = resolve_closed_set_answer(
+    resolution = resolve_respondent_answer(
         raw_text=raw_text,
         options=options,
         stored_option=stored_option,
-        require_whole_answer=True,
     )
 
     if resolution.status == "UNCERTAIN":

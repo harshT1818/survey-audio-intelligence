@@ -1,6 +1,6 @@
 from src.domain.models import SurveyQuestion
-from src.resolver.closed_set import resolve_closed_set_answer
 from src.resolver.models import AnswerResolution, CanonicalOption
+from src.resolver.respondent_answer import resolve_respondent_answer
 
 
 def resolve_question_answer(
@@ -15,9 +15,8 @@ def resolve_question_answer(
         else None
     )
 
-    return resolve_closed_set_answer(
+    return resolve_respondent_answer(
         raw_text=transcript_text,
         options=canonical_options,
         stored_option=stored_option,
-        require_whole_answer=True,
     )

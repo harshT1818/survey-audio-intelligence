@@ -118,6 +118,30 @@ def _covers_whole_answer(
     )
 
 
+def comparison_status(
+    resolved_option: str,
+    stored_option: str | None,
+) -> str:
+    if stored_option is None:
+        return "MATCH"
+
+    if (
+        _normalize(resolved_option)
+        == _normalize(stored_option)
+    ):
+        return "MATCH"
+
+    return "MISMATCH"
+
+
+def is_uncertain_response(
+    raw_text: str,
+) -> bool:
+    return _is_uncertain_response(
+        raw_text
+    )
+
+
 def _is_uncertain_response(
     raw_text: str,
 ) -> bool:
@@ -262,23 +286,14 @@ def resolve_closed_set_answer(
                 candidates=scored[:3],
             )
 
-    if stored_option is None:
-        status = "MATCH"
-
-    elif (
-        _normalize(best.option)
-        == _normalize(stored_option)
-    ):
-        status = "MATCH"
-
-    else:
-        status = "MISMATCH"
-
     return AnswerResolution(
         raw_text=raw_text,
         resolved_option=best.option,
         stored_option=stored_option,
-        status=status,
+        status=comparison_status(
+            best.option,
+            stored_option,
+        ),
         confidence=best.score,
         candidates=scored[:3],
     )
