@@ -133,3 +133,12 @@ def test_inactive_policy_is_not_executed():
     report = evaluate_full_sample(**data)
     assert report["summary"]["evaluated"] == 0
     assert report["questions"][0]["status"] == "INACTIVE_POLICY"
+
+
+def test_side_without_validation_is_not_required():
+    data = inputs()
+    data["policy"].tags["state_govt_change"].question_validation.enabled = False
+    row = evaluate_full_sample(**data)["questions"][0]
+
+    assert "question" not in row["automation"]["unresolved_sides"]
+    assert [p["side"] for p in row["automation"]["proposals"]] == ["answer"]

@@ -342,3 +342,25 @@ def test_resolution_disagreement_blocks_answer_proposal():
         "answer"
         in result.unresolved_sides
     )
+
+def test_no_required_side_and_no_proposal_is_not_auto_fill():
+    audit = QuestionAuditResult(
+        question_key="remarks",
+        evidence=_evidence(),
+        review_required=False,
+    )
+    evidence = CorroboratedEvidenceResult(
+        evidence_strength="WEAK",
+        automation_status="HUMAN_REVIEW",
+        review_required=False,
+    )
+
+    result = decide_question_automation(
+        audit,
+        evidence,
+        require_question_disposition=False,
+        require_answer_disposition=False,
+    )
+
+    assert result.action == "HUMAN_REVIEW"
+    assert result.proposals == []

@@ -92,6 +92,9 @@ def evaluate_full_sample(
             canonical_options=canonical_options_from_question(definition),
             tag_policy=tag_policy,
             no_prompting_path=no_prompting_path, prompting_path=prompting_path,
+            # Only sides the policy audits need a suggestion.
+            require_question_disposition=tag_policy.question_validation.enabled,
+            require_answer_disposition=tag_policy.answer_validation.enabled,
         )
         human = human_audit.get(tag) or {}
         rows.append({

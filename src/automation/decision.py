@@ -280,8 +280,11 @@ def decide_question_automation(
         == required_count
     )
 
+    # With no proposals at all there is nothing to fill,
+    # even when the policy requires neither side.
     all_required_auto_fill = (
         all_required_present
+        and bool(proposals)
         and all(
             proposal.action
             == "AUTO_FILL"

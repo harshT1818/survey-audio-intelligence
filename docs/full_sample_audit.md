@@ -42,3 +42,7 @@ pipeline failure. Prompted-party nodes ("Prompting -<party>") and
 combinations are left to the auditor. A node that requires a comment is
 never auto-filled; it can at most be prefilled.
 The runner is offline and does not update the CRM.
+
+Only sides the tag's policy audits are required: a tag with question
+validation disabled never reports the question side as unresolved. A question
+with no proposals is never `AUTO_FILL`, even when no side is required.
