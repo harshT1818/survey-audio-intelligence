@@ -74,7 +74,11 @@ Turn export (`export_interview_turns.py`) builds speaker turns once for the
 whole interview and transcribes each once, so boundary turns are no longer cut
 or repeated and speech between audited questions is transcribed. Loud
 stretches with no diarized speaker become `unattributed` turns (role unknown):
-shown to auditors, never used for automatic decisions. Questions reference the
+shown to auditors, never used for automatic decisions. Unattributed stretches in
+which ASR finds no words are treated as background noise and do not force
+review. When no single interviewer turn resembles the script, the start of the
+passage that paraphrase matching attributed to the question anchors the answer
+evidence (`SCRIPT_MATCH_PASSAGE`). Questions reference the
 turns overlapping their windows with window-clipped timing.
 
 Paraphrase-tolerant question validation (`script_match.py`, runner default,

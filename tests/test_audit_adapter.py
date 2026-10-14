@@ -740,3 +740,14 @@ def test_material_overlap_downgrades_auto_fill():
         .review_required
         is True
     )
+
+
+def test_unattributed_noise_without_words_is_not_material():
+    from src.full_sample.audit_adapter import _is_material_rejection
+
+    noise = {"role": "unknown", "asr_status": "EMPTY", "transcript": "", "start_sec": 1.0,
+             "end_sec": 9.0, "undetected_by_diarization": True}
+    speech = {**noise, "asr_status": "COMPLETE", "transcript": "बताया नहीं"}
+
+    assert _is_material_rejection(noise, ["UNKNOWN_ROLE", "EMPTY_TRANSCRIPT"], 0.35) is False
+    assert _is_material_rejection(speech, ["UNKNOWN_ROLE"], 0.35) is True

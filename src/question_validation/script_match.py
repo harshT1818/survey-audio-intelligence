@@ -106,7 +106,7 @@ SYNONYMS = {
     "एमएलए": "विधायक", "विधायकी": "विधायक", "एमपी": "सांसद", "सीएम": "मुख्यमंत्री",
     "पीएम": "प्रधानमंत्री", "कैंडिडेट": "प्रत्याशी", "उम्मीदवार": "प्रत्याशी",
     "उम्मीदवारों": "प्रत्याशी", "इलेक्शन": "चुनाव", "दल": "पार्टी", "परिवर्तन": "बदलाव",
-    "मतदान": "वोट", "समर्थन": "वोट",
+    "मतदान": "वोट", "समर्थन": "वोट", "फोन": "मोबाइल",
 }
 
 # Systematic Vaani confusions observed in these interviews: "को वोट" is
@@ -403,6 +403,8 @@ def options_mentioned(index: OptionIndex, text: str) -> set[str]:
 # --------------------------------------------------------------------------
 
 ASKED_RIGHT_COVERAGE = 0.70
+# Enough of the question to say where it was asked, not that it was asked right.
+ANCHOR_COVERAGE = 0.50
 PRE_WINDOW_SEC = 5.0
 
 
@@ -415,6 +417,9 @@ class AskingAssessment:
     text: str = ""
     turn_indices: list = field(default_factory=list)
     named_options: list[str] = field(default_factory=list)
+    # First turn of the matched passage, when it is good enough to mark
+    # where the question was asked (for the answer side).
+    anchor_turn_index: int | None = None
 
 
 def interviewer_passages(turns: list[dict], start: float, end: float) -> list[list[dict]]:
@@ -536,6 +541,9 @@ def assess_asking(
         text=text,
         turn_indices=[t.get("turn_index") for t in run],
         named_options=named,
+        anchor_turn_index=(
+            run[0].get("turn_index") if fits and match.coverage >= ANCHOR_COVERAGE else None
+        ),
     )
 
 

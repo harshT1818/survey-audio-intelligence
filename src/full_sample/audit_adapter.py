@@ -315,6 +315,15 @@ def _is_material_rejection(
         "UNKNOWN_ROLE",
     }
 
+    # Loud audio that no diarized speaker covered and in which ASR found
+    # no words is treated as background noise. With words, it stays
+    # material: someone spoke and we do not know who.
+    if (
+        turn.get("undetected_by_diarization")
+        and turn.get("asr_status") in {"EMPTY", "SKIPPED_SHORT"}
+    ):
+        return False
+
     if any(
         reason
         in material_reason_names
@@ -417,6 +426,7 @@ def build_safe_audit_inputs(
     dialogue: dict[str, Any],
     question_window: dict[str, Any],
     material_missing_audio_min_sec: float = 0.35,
+    fallback_anchor_turn_index: int | None = None,
 ) -> SafeAuditInputs:
     """
     Convert rich full-sample dialogue into the two inputs
@@ -472,6 +482,20 @@ def build_safe_audit_inputs(
             "score"
         )
     )
+
+    # When no single turn resembles the script closely enough, the start
+    # of the interviewer passage that paraphrase matching attributed to
+    # this question is used instead.
+    if anchor is None and fallback_anchor_turn_index is not None:
+        for turn in turns:
+            if (
+                turn.get("turn_index") == fallback_anchor_turn_index
+                and turn.get("role") == "agent"
+                and turn.get("start_sec") is not None
+            ):
+                anchor = turn
+                trace.anchor_method = "SCRIPT_MATCH_PASSAGE"
+                break
 
     if anchor is None:
         trace.review_required = True
@@ -758,21 +782,12 @@ def run_full_question_audit(
     option_index: OptionIndex | None = None,
     do_not_read_options: bool = False,
 ) -> FullQuestionAuditResult:
-    inputs = build_safe_audit_inputs(
-        dialogue=rich_dialogue,
-        question_window=(
-            question_window
-        ),
-    )
-
     # Question side: judged from every interviewer passage near the
     # window, not only the safe dialogue after the anchor. Answers still
-    # come only from the safe dialogue.
+    # come only from the safe dialogue, which starts at the anchor.
+    assessment = None
     question_validation_result = None
-    if (
-        script_profile is not None
-        and tag_policy.question_validation.enabled
-    ):
+    if script_profile is not None:
         assessment = assess_asking(
             profile=script_profile,
             turns=list(rich_dialogue.get("turns", [])),
@@ -781,10 +796,23 @@ def run_full_question_audit(
             option_index=option_index,
             do_not_read_options=do_not_read_options,
         )
-        question_validation_result = to_validation_result(
-            assessment,
-            expected_question=question.text_hi or question.text_en or "",
-        )
+        if tag_policy.question_validation.enabled:
+            question_validation_result = to_validation_result(
+                assessment,
+                expected_question=question.text_hi or question.text_en or "",
+            )
+
+    inputs = build_safe_audit_inputs(
+        dialogue=rich_dialogue,
+        question_window=(
+            question_window
+        ),
+        fallback_anchor_turn_index=(
+            assessment.anchor_turn_index
+            if assessment is not None
+            else None
+        ),
+    )
 
     audit = audit_question(
         question=question,

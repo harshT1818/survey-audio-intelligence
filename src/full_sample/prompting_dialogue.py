@@ -329,6 +329,13 @@ def build_prompting_dialogue(
                         False,
                     )
                 ),
+                # Loud audio no diarized speaker covered.
+                "undetected_by_diarization": bool(
+                    row.get(
+                        "undetected_by_diarization",
+                        False,
+                    )
+                ),
                 "requested_padding_sec": (
                     row.get(
                         "requested_padding_sec"

@@ -172,3 +172,19 @@ def test_script_matching_can_be_switched_off():
     from src.question_validation.fuzzy import validate_question_text
     legacy = validate_question_text(QUESTION_TEXT, data["dialogues"][0]["turns"][0]["transcript"])
     assert row["audit"]["question_validation_confidence"] == legacy.confidence
+
+
+def test_matched_passage_anchors_when_no_single_turn_resembles_the_script():
+    from src.full_sample.audit_adapter import build_safe_audit_inputs
+
+    dialogue = make_dialogue([
+        make_turn(1, "agent", 10.0, 12.0, "दीदी वो वाली बात बताइए"),
+        make_turn(2, "respondent", 12.5, 13.5, "हाँ"),
+    ])
+    without = build_safe_audit_inputs(dialogue, make_window())
+    with_fallback = build_safe_audit_inputs(dialogue, make_window(), fallback_anchor_turn_index=1)
+
+    assert without.trace.anchor_found is False
+    assert with_fallback.trace.anchor_found is True
+    assert with_fallback.trace.anchor_method == "SCRIPT_MATCH_PASSAGE"
+    assert [t.speaker for t in with_fallback.dialogue.turns] == ["agent", "respondent"]
