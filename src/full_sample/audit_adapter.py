@@ -37,6 +37,12 @@ from src.full_sample.prompting_benchmark import (
 from src.full_sample.turn_safety import (
     decision_rejection_reasons,
 )
+from src.question_validation.script_match import (
+    OptionIndex,
+    ScriptProfile,
+    assess_asking,
+    to_validation_result,
+)
 from src.resolver.models import (
     CanonicalOption,
 )
@@ -748,6 +754,9 @@ def run_full_question_audit(
     ) = None,
     require_question_disposition: bool = True,
     require_answer_disposition: bool = True,
+    script_profile: ScriptProfile | None = None,
+    option_index: OptionIndex | None = None,
+    do_not_read_options: bool = False,
 ) -> FullQuestionAuditResult:
     inputs = build_safe_audit_inputs(
         dialogue=rich_dialogue,
@@ -755,6 +764,27 @@ def run_full_question_audit(
             question_window
         ),
     )
+
+    # Question side: judged from every interviewer passage near the
+    # window, not only the safe dialogue after the anchor. Answers still
+    # come only from the safe dialogue.
+    question_validation_result = None
+    if (
+        script_profile is not None
+        and tag_policy.question_validation.enabled
+    ):
+        assessment = assess_asking(
+            profile=script_profile,
+            turns=list(rich_dialogue.get("turns", [])),
+            window_start=float(question_window.get("start_sec", 0.0)),
+            window_end=float(question_window.get("end_sec", 0.0)),
+            option_index=option_index,
+            do_not_read_options=do_not_read_options,
+        )
+        question_validation_result = to_validation_result(
+            assessment,
+            expected_question=question.text_hi or question.text_en or "",
+        )
 
     audit = audit_question(
         question=question,
@@ -769,6 +799,7 @@ def run_full_question_audit(
         prompting_path=(
             prompting_path
         ),
+        question_validation_result=question_validation_result,
         prompting_evidence_complete=not any(
             item.material_for_review
             for item in inputs.trace.rejected_turns

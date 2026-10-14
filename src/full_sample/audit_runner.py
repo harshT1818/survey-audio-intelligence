@@ -7,7 +7,20 @@ from src.audit_policy.answer_tree import answer_prompting_paths
 from src.audit_policy.models import AuditProjectPolicy
 from src.domain.models import SurveyQuestion
 from src.full_sample.audit_adapter import run_full_question_audit
-from src.full_sample.survey_options import canonical_options_from_question
+from src.full_sample.survey_options import canonical_options_from_question, primary_label
+from src.question_validation.script_match import build_option_index, build_profiles
+
+
+def piped_answer_labels(windows: list[dict[str, Any]]) -> dict[str, str]:
+    """Recorded answers by tag, for questions that quote an earlier answer."""
+    labels = {}
+    for window in windows:
+        stored = window.get("stored_response")
+        first = stored[0] if isinstance(stored, list) and stored else stored
+        label = primary_label(first) if isinstance(first, str) else None
+        if label:
+            labels[window["tag"]] = label
+    return labels
 
 
 def index_by_tag(rows):
@@ -49,6 +62,7 @@ def evaluate_full_sample(
     survey_definition: dict[str, Any], policy: AuditProjectPolicy,
     human_audit: dict[str, Any], tags: list[str] | None = None,
     prompting_aware_answers: bool = False,
+    script_matching: bool = True,
 ) -> dict[str, Any]:
     # prompting_aware_answers enables "Yes - No Prompting Done" on flat
     # prompting trees. Off by default: the prompting detector reports
@@ -57,6 +71,12 @@ def evaluate_full_sample(
     dialogue_map = index_by_tag(dialogues)
     window_map = index_by_tag(windows)
     survey_map = index_by_tag(survey_definition["questions"])
+    # Paraphrase-tolerant question checks need the whole questionnaire
+    # (to weight words) and earlier answers (for piped names).
+    profiles = build_profiles(
+        {tag: q.get("question_text") or "" for tag, q in survey_map.items()},
+        piped_answer_labels(windows),
+    ) if script_matching else {}
     requested = list(dict.fromkeys(tags if tags is not None else window_map))
     rows = []
     for tag in requested:
@@ -91,6 +111,9 @@ def evaluate_full_sample(
             rich_dialogue=dialogue, question_window=window,
             canonical_options=canonical_options_from_question(definition),
             tag_policy=tag_policy,
+            script_profile=profiles.get(tag),
+            option_index=build_option_index(canonical_options_from_question(definition)),
+            do_not_read_options=bool(definition.get("do_not_read_options")),
             no_prompting_path=no_prompting_path, prompting_path=prompting_path,
             # Only sides the policy audits need a suggestion.
             require_question_disposition=tag_policy.question_validation.enabled,

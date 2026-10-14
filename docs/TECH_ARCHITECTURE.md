@@ -62,12 +62,28 @@ force review; meaningful overlap does. Upstream review can downgrade an otherwis
 automatic result to prefill.
 
 The core engine extracts agent question text, initial respondent response,
-intervening agent follow-up, and final respondent response. Question validation
-uses fuzzy similarity; answer resolution uses canonical choices and, for
+intervening agent follow-up, and final respondent response. In the
+full-sample runner, question validation uses `question_validation/script_match.py`
+(see below); elsewhere it uses fuzzy similarity. Answer resolution uses canonical choices and, for
 respondent text, requires the utterance as a whole to match an option, so an
 option word inside a longer statement is left for review. Prompting-aware
 mapping requires explicit policy paths. Confidence/similarity values are scores,
 not calibrated probabilities.
+
+Paraphrase-tolerant question validation (`script_match.py`, runner default,
+`script_matching=False` restores the fuzzy check) measures weighted coverage of
+the question's content in interviewer speech. The script is cleaned to its
+spoken form (instructions and placeholders removed, piped answers filled,
+digits as Hindi words); words are weighted by inverse frequency across the
+questionnaire, with introductory sentences at 0.1 and piped names at 0.5; words
+match through stemming, consonant skeletons, joined compounds, a small synonym
+list and observed ASR merges ("कोर्ट" = "को वोट"). Every interviewer passage from
+5 s before the window is scored. Asked Right needs coverage ≥ 0.70 and the
+passage must fit the question at least as well as each look-alike question on
+the words that differ. One option named by the interviewer on a do-not-read
+question withholds it; several named options, a missing question word or an
+overlapping voice limit it to prefill. Thresholds were set on four audited
+interviews and checked on three others. It is string processing only.
 
 Anchor selection and question validation have different scoring/normalization
 and thresholds. A found anchor is not proof the question was asked correctly.

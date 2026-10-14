@@ -47,7 +47,8 @@ Paths are relative to `src/`. Package `__init__.py` files provide structure.
 | `dialogue/models.py`, `question_window.py` | Speech turns and agent question/initial response/follow-up/final response extraction |
 | `resolver/models.py`, `option_parser.py`, `closed_set.py`, `question_resolver.py` | Canonical options, SurveyXpress parsing, spoken-answer matching and stored-answer comparison |
 | `resolver/respondent_answer.py` | Respondent answers: whole-answer match, then unique name mention (consonant skeleton, negation/alternative guards), then small Hindi numbers; rule results are prefill strength (0.80) |
-| `question_validation/models.py`, `fuzzy.py` | Question-text validation by fuzzy similarity |
+| `question_validation/models.py`, `fuzzy.py` | Question-text validation by fuzzy similarity (legacy and non-runner paths) |
+| `question_validation/script_match.py` | Paraphrase-tolerant question check used by the runner: spoken-form script, weighted content coverage over interviewer passages, look-alike questions, options named on do-not-read questions |
 | `prompting/models.py`, `rules.py` | Rule-based prompting evidence |
 | `audit_policy/models.py`, `parser.py` | Project/tag policy and nested dispositions; external key is spelled `desposition` |
 | `audit_policy/mapper.py`, `question_mapper.py`, `prompting_mapper.py` | Answer/question mapping and explicit nested prompting paths |

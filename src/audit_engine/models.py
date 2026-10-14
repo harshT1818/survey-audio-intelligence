@@ -27,6 +27,8 @@ class QuestionAuditResult(BaseModel):
     evidence: QuestionEvidence
 
     question_validation_status: str | None = None
+    # Asked Right is suggested but must be confirmed (prefill only).
+    question_review_required: bool = False
     question_validation_confidence: float | None = Field(
         default=None,
         ge=0,

@@ -40,6 +40,19 @@ def _question_proposal(
             reason=COMMENT_REQUIRED_REASON,
         )
 
+    if audit.question_review_required:
+        return DispositionProposal(
+            side="question",
+            disposition=(
+                audit.question_disposition
+            ),
+            action="PREFILL",
+            reason=(
+                "Asked Right is likely, but the question "
+                "evidence needs a person to confirm it."
+            ),
+        )
+
     return DispositionProposal(
         side="question",
         disposition=(

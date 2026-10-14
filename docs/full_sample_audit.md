@@ -46,3 +46,10 @@ The runner is offline and does not update the CRM.
 Only sides the tag's policy audits are required: a tag with question
 validation disabled never reports the question side as unresolved. A question
 with no proposals is never `AUTO_FILL`, even when no side is required.
+
+Question validation uses paraphrase-tolerant script matching by default
+(`evaluate_full_sample(script_matching=False)` restores the fuzzy check). It
+reads every interviewer passage near the question, not only the safe dialogue
+after the anchor, so a brief overlap no longer discards the question side;
+such cases, options read aloud and an unheard question word are prefill only.
+Answers still come only from the safe dialogue.

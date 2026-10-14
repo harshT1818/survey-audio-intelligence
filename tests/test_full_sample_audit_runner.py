@@ -142,3 +142,33 @@ def test_side_without_validation_is_not_required():
 
     assert "question" not in row["automation"]["unresolved_sides"]
     assert [p["side"] for p in row["automation"]["proposals"]] == ["answer"]
+
+
+def test_paraphrased_question_gets_asked_right():
+    data = inputs()
+    data["dialogues"][0]["turns"][0]["transcript"] = "अच्छा दीदी आप राज्य सरकार में बदलाव देखना चाहती हैं"
+    row = evaluate_full_sample(**data)["questions"][0]
+
+    assert row["audit"]["question_validation_status"] == "ASKED_RIGHT"
+    question = [p for p in row["automation"]["proposals"] if p["side"] == "question"][0]
+    assert question["disposition"]["disposition_text"] == "Asked Right"
+
+
+def test_overlapping_question_is_prefill_only():
+    data = inputs()
+    data["dialogues"][0]["turns"][0]["raw_cross_speaker_overlap"] = True
+    row = evaluate_full_sample(**data)["questions"][0]
+
+    question = [p for p in row["automation"]["proposals"] if p["side"] == "question"][0]
+    assert question["action"] == "PREFILL"
+    assert row["audit"]["question_review_required"] is True
+
+
+def test_script_matching_can_be_switched_off():
+    data = inputs()
+    data["dialogues"][0]["turns"][0]["transcript"] = "अच्छा दीदी आप राज्य सरकार में बदलाव देखना चाहती हैं"
+    row = evaluate_full_sample(**data, script_matching=False)["questions"][0]
+
+    from src.question_validation.fuzzy import validate_question_text
+    legacy = validate_question_text(QUESTION_TEXT, data["dialogues"][0]["turns"][0]["transcript"])
+    assert row["audit"]["question_validation_confidence"] == legacy.confidence

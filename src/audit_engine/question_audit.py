@@ -19,6 +19,7 @@ from src.dialogue.question_window import (
 )
 from src.domain.models import SurveyQuestion
 from src.prompting.rules import detect_prompting
+from src.question_validation.models import QuestionValidationResult
 from src.question_validation.fuzzy import (
     validate_question_text,
 )
@@ -36,6 +37,7 @@ def audit_question(
     no_prompting_path: list[str] | None = None,
     prompting_path: list[str] | None = None,
     prompting_evidence_complete: bool = True,
+    question_validation_result: QuestionValidationResult | None = None,
 ) -> QuestionAuditResult:
     # prompting_evidence_complete is False when material turns were
     # removed before this dialogue was built, so silence in the safe
@@ -70,11 +72,17 @@ def audit_question(
             or ""
         )
 
-        question_validation = validate_question_text(
-            expected_question=expected_question,
-            transcript_text=(
-                dialogue_evidence.agent_question_text
-            ),
+        # A caller with the full interview (all interviewer passages, the
+        # questionnaire) can supply a paraphrase-tolerant result instead.
+        question_validation = (
+            question_validation_result
+            if question_validation_result is not None
+            else validate_question_text(
+                expected_question=expected_question,
+                transcript_text=(
+                    dialogue_evidence.agent_question_text
+                ),
+            )
         )
 
         question_suggestion = (
@@ -219,6 +227,12 @@ def audit_question(
             question_validation.confidence
             if question_validation
             else None
+        ),
+
+        question_review_required=bool(
+            question_suggestion is not None
+            and question_suggestion.status == "SUGGESTED"
+            and question_suggestion.review_required
         ),
 
         question_disposition=(
