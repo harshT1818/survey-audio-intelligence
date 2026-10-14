@@ -74,6 +74,7 @@ All files below are in `src/full_sample/`.
 | `speaker_roles.py` | Full-sample role inference from question/core speech statistics; distinct from `src/speaker_roles/`. Agent = introduction-dominant speaker; respondent = non-agent speaker with ≥3× the next one's speech; further speakers `unknown`. If no respondent dominates, status `AGENT_ONLY` keeps the agent and marks all others `unknown` (answers stay with the auditor). `infer_real_speaker_roles.py --agent-speaker <id>` records a listened interviewer label as `human_agent_label` evidence |
 | `speaker_turns.py` | Merge segments, attach roles, mark exportable turns |
 | `speaker_safe_export.py` | Constrain padding against other speakers; retain genuine raw overlap |
+| `interview_turns.py` | Whole-interview turns, unattributed-speech detection by loudness, per-question rows sharing clips |
 | `prompting_dialogue.py` | Join manifest to ASR results, retaining source/status metadata |
 | `dialogue_merge.py` | ASR coverage against a turn manifest; merge dialogues by tag, refusing duplicates |
 | `prompting_benchmark.py` | Question anchors, baseline prompting, human-label parsing and option helpers |
@@ -97,7 +98,7 @@ some defaults cover only experimental tags and some demo paths are hard-coded.
 | Colab batching | `colab_batch.py` (`pack-audio`/`unpack-diarization` for Sortformer, `pack-turns`/`unpack-asr` for Vaani; clips prefixed `<response_id>__`; never replaces different files without `--overwrite`) |
 | Diarization/refinement | `run_diarization.py`, `export_diarization_clips.py`, `refine_problem_segments.py`, `compare_diarization.py` (`--checkpoints` + one or more diarization JSONs) |
 | Role evidence | `build_real_question_dialogue_segments.py`, `infer_real_speaker_roles.py` |
-| Turn export | `export_real_prompting_turns.py` (custom tags, output directory and manifest supported) |
+| Turn export | `export_interview_turns.py` (recommended: every turn of the interview exported once as a whole utterance, plus loud stretches no diarized speaker covers as `unattributed`; writes `interview_turns.json` and per-question rows referencing shared clips), `export_real_prompting_turns.py` (legacy per-question clips; cuts turns at window edges and repeats boundary turns) |
 | Dialogue assembly | `build_real_prompting_dialogue.py`, `build_real_prompting_dialogue_clean.py`, `merge_prompting_dialogue.py` (`--sample-dir`; builds a turn batch and merges it into the clean dialogue) |
 | Prompting evaluation | `evaluate_real_prompting.py`, `evaluate_clean_prompting.py`, `diagnose_real_prompting_evidence.py` |
 | Full audit | `evaluate_full_sample_audit.py` (`--sample-dir`, optional `--tags`) |

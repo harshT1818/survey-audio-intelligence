@@ -31,6 +31,7 @@ DIARIZATION_NAME = "interview_16k_mono_diarization.json"
 TURN_MANIFEST_NAME = "prompting_turn_manifest_clean.json"
 TURN_AUDIO_DIR = "prompting_turn_audio_clean"
 TURN_ASR_NAME = "prompting_turn_asr_results_clean.json"
+INTERVIEW_TURNS_NAME = "interview_turns.json"
 
 
 def load_json(path: Path):
@@ -77,24 +78,40 @@ def unpack_diarization(archive_path: Path, overwrite: bool) -> None:
             print(f"  {status:9} {response_id}  {len(payload['segments'])} segments  {payload.get('model_name')}")
 
 
+def sample_turns(response_id: str) -> list[dict]:
+    """Turns to transcribe: the whole interview when exported that way."""
+    interview = SAMPLES_ROOT / response_id / INTERVIEW_TURNS_NAME
+    if interview.exists():
+        return load_json(interview)
+    return load_json(SAMPLES_ROOT / response_id / TURN_MANIFEST_NAME)
+
+
+def clip_source(response_id: str, row: dict) -> Path:
+    path = Path(str(row.get("audio_file") or ""))
+    if path.is_file():
+        return path
+    return SAMPLES_ROOT / response_id / TURN_AUDIO_DIR / basename(row.get("audio_file"))
+
+
 def pack_turns(response_ids: list[str], output_dir: Path) -> None:
-    manifests = {
-        response_id: load_json(SAMPLES_ROOT / response_id / TURN_MANIFEST_NAME)
-        for response_id in response_ids
-    }
+    manifests = {response_id: sample_turns(response_id) for response_id in response_ids}
     combined = combine_turn_manifests(manifests)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     archive_path = output_dir / "turns_batch.zip"
     clip_count = 0
     with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as archive:
+        added = set()
         for response_id, rows in manifests.items():
-            audio_dir = SAMPLES_ROOT / response_id / TURN_AUDIO_DIR
             for row in rows:
                 clip_name = basename(row.get("audio_file"))
                 if not row.get("export_for_asr") or not clip_name:
                     continue
-                archive.write(audio_dir / clip_name, prefixed_clip_name(response_id, clip_name))
+                arcname = prefixed_clip_name(response_id, clip_name)
+                if arcname in added:
+                    continue
+                archive.write(clip_source(response_id, row), arcname)
+                added.add(arcname)
                 clip_count += 1
             print(f"  {response_id}  {sum(1 for r in rows if r.get('export_for_asr'))} clips")
 
@@ -111,8 +128,7 @@ def unpack_asr(results_path: Path, overwrite: bool, allow_incomplete: bool) -> N
     split = split_asr_results(load_json(results_path), response_ids)
 
     for response_id in sorted(response_ids):
-        sample_manifest = load_json(SAMPLES_ROOT / response_id / TURN_MANIFEST_NAME)
-        coverage = asr_coverage(sample_manifest, split[response_id])
+        coverage = asr_coverage(sample_turns(response_id), split[response_id])
         blockers = coverage_blockers(coverage)
         print(f"  {response_id}  expected={coverage['expected']} received={coverage['received']} "
               f"empty={len(coverage['empty'])} {'; '.join(blockers) or 'OK'}")

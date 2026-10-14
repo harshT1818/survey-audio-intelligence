@@ -70,6 +70,13 @@ option word inside a longer statement is left for review. Prompting-aware
 mapping requires explicit policy paths. Confidence/similarity values are scores,
 not calibrated probabilities.
 
+Turn export (`export_interview_turns.py`) builds speaker turns once for the
+whole interview and transcribes each once, so boundary turns are no longer cut
+or repeated and speech between audited questions is transcribed. Loud
+stretches with no diarized speaker become `unattributed` turns (role unknown):
+shown to auditors, never used for automatic decisions. Questions reference the
+turns overlapping their windows with window-clipped timing.
+
 Paraphrase-tolerant question validation (`script_match.py`, runner default,
 `script_matching=False` restores the fuzzy check) measures weighted coverage of
 the question's content in interviewer speech. The script is cleaned to its
