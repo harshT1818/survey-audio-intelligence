@@ -181,11 +181,18 @@ def resolve_small_number(
         return _uncertain(raw_text, stored_option)
 
     value = numbers.pop()
+
+    # Spoken Hindi numbers are easily misheard (अट्ठाईस 28 vs
+    # अड़तीस 38), so a number can confirm the recorded answer but
+    # never contradict it: a disagreement goes to the auditor.
+    if value != stored:
+        return _uncertain(raw_text, stored_option)
+
     return AnswerResolution(
         raw_text=raw_text,
         resolved_option=str(value),
         stored_option=stored_option,
-        status="MATCH" if value == stored else "MISMATCH",
+        status="MATCH",
         confidence=RULE_CONFIDENCE,
     )
 

@@ -85,6 +85,7 @@ def infer_speaker_roles(
     questions: list[
         dict[str, Any]
     ],
+    agent_speaker: str | None = None,
 ) -> dict[str, Any]:
     """
     Infer the global interviewer/respondent mapping.
@@ -123,125 +124,145 @@ def infer_speaker_roles(
         }
 
     evidence = []
+    if agent_speaker is not None:
+        if agent_speaker not in speaker_totals:
+            raise ValueError(
+                f"Unknown agent speaker: {agent_speaker}"
+            )
 
-    introduction = find_question(
-        questions,
-        "introduction",
-    )
+        dominant_speaker = agent_speaker
 
-    if introduction is None:
-        return {
-            "status": "UNRESOLVED",
-            "reason": (
-                "Introduction question "
-                "was not available."
-            ),
-            "speaker_totals_sec": (
-                speaker_totals
-            ),
-            "roles": {},
-            "evidence": [],
-        }
-
-    intro_times = (
-        _speaker_core_time(
-            introduction
+        evidence.append(
+            {
+                "type": "human_agent_label",
+                "speaker_id": agent_speaker,
+                "interpretation": (
+                    "Interviewer identified by a person "
+                    "listening to the introduction."
+                ),
+            }
         )
-    )
 
-    if not intro_times:
-        return {
-            "status": "UNRESOLVED",
-            "reason": (
-                "No diarized speech found "
-                "inside introduction."
-            ),
-            "speaker_totals_sec": (
-                speaker_totals
-            ),
-            "roles": {},
-            "evidence": [],
-        }
+    else:
 
-    ranked_intro = sorted(
-        intro_times.items(),
-        key=lambda item: (
-            -item[1],
-            item[0],
-        ),
-    )
+        introduction = find_question(
+            questions,
+            "introduction",
+        )
 
-    dominant_speaker = (
-        ranked_intro[0][0]
-    )
+        if introduction is None:
+            return {
+                "status": "UNRESOLVED",
+                "reason": (
+                    "Introduction question "
+                    "was not available."
+                ),
+                "speaker_totals_sec": (
+                    speaker_totals
+                ),
+                "roles": {},
+                "evidence": [],
+            }
 
-    dominant_duration = (
-        ranked_intro[0][1]
-    )
+        intro_times = (
+            _speaker_core_time(
+                introduction
+            )
+        )
 
-    other_duration = (
-        ranked_intro[1][1]
-        if len(ranked_intro) > 1
-        else 0.0
-    )
+        if not intro_times:
+            return {
+                "status": "UNRESOLVED",
+                "reason": (
+                    "No diarized speech found "
+                    "inside introduction."
+                ),
+                "speaker_totals_sec": (
+                    speaker_totals
+                ),
+                "roles": {},
+                "evidence": [],
+            }
 
-    evidence.append(
-        {
-            "type": (
-                "introduction_anchor"
+        ranked_intro = sorted(
+            intro_times.items(),
+            key=lambda item: (
+                -item[1],
+                item[0],
             ),
-            "tag": "introduction",
-            "speaker_id": (
-                dominant_speaker
-            ),
-            "core_speech_sec": round(
-                dominant_duration,
-                3,
-            ),
-            "other_speaker_sec": round(
-                other_duration,
-                3,
-            ),
-            "interpretation": (
-                "Introduction is expected "
-                "to be interviewer-led."
-            ),
-        }
-    )
+        )
 
-    if dominant_duration < 2.0:
-        return {
-            "status": "UNRESOLVED",
-            "reason": (
-                "Introduction did not contain "
-                "enough dominant speech."
-            ),
-            "speaker_totals_sec": (
-                speaker_totals
-            ),
-            "roles": {},
-            "evidence": evidence,
-        }
+        dominant_speaker = (
+            ranked_intro[0][0]
+        )
 
-    if (
-        other_duration > 0
-        and (
-            dominant_duration
-            / other_duration
-        ) < 3.0
-    ):
-        return {
-            "status": "UNRESOLVED",
-            "reason": (
-                "Introduction was not "
-                "speaker-dominant enough."
-            ),
-            "speaker_totals_sec": (
-                speaker_totals
-            ),
-            "roles": {},
-            "evidence": evidence,
-        }
+        dominant_duration = (
+            ranked_intro[0][1]
+        )
+
+        other_duration = (
+            ranked_intro[1][1]
+            if len(ranked_intro) > 1
+            else 0.0
+        )
+
+        evidence.append(
+            {
+                "type": (
+                    "introduction_anchor"
+                ),
+                "tag": "introduction",
+                "speaker_id": (
+                    dominant_speaker
+                ),
+                "core_speech_sec": round(
+                    dominant_duration,
+                    3,
+                ),
+                "other_speaker_sec": round(
+                    other_duration,
+                    3,
+                ),
+                "interpretation": (
+                    "Introduction is expected "
+                    "to be interviewer-led."
+                ),
+            }
+        )
+
+        if dominant_duration < 2.0:
+            return {
+                "status": "UNRESOLVED",
+                "reason": (
+                    "Introduction did not contain "
+                    "enough dominant speech."
+                ),
+                "speaker_totals_sec": (
+                    speaker_totals
+                ),
+                "roles": {},
+                "evidence": evidence,
+            }
+
+        if (
+            other_duration > 0
+            and (
+                dominant_duration
+                / other_duration
+            ) < 3.0
+        ):
+            return {
+                "status": "UNRESOLVED",
+                "reason": (
+                    "Introduction was not "
+                    "speaker-dominant enough."
+                ),
+                "speaker_totals_sec": (
+                    speaker_totals
+                ),
+                "roles": {},
+                "evidence": evidence,
+            }
 
     # Extra speakers (family members, bystanders) are expected in
     # field interviews. The respondent must clearly out-talk every
@@ -297,8 +318,27 @@ def infer_speaker_roles(
             )
             < RESPONDENT_DOMINANCE_RATIO
         ):
+            # The interviewer is still clear from the
+            # introduction. Keep that role and leave every
+            # other speaker unknown, so the question side can
+            # be checked while answers stay with the auditor.
+            roles = {
+                dominant_speaker: {
+                    "role": "agent",
+                    "confidence": "MODERATE",
+                },
+            }
+
+            for speaker in speakers:
+                if speaker != dominant_speaker:
+                    roles[speaker] = {
+                        "role": "unknown",
+                        "confidence": "UNRESOLVED",
+                    }
+
             return {
-                "status": "UNRESOLVED",
+                "status": "AGENT_ONLY",
+                "confidence": "MODERATE",
                 "reason": (
                     "No single non-interviewer "
                     "speaker is dominant enough "
@@ -307,7 +347,7 @@ def infer_speaker_roles(
                 "speaker_totals_sec": (
                     speaker_totals
                 ),
-                "roles": {},
+                "roles": roles,
                 "evidence": evidence,
             }
 

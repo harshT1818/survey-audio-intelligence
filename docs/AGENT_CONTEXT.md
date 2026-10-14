@@ -70,7 +70,7 @@ All files below are in `src/full_sample/`.
 | `survey_definition.py` | CSV/TSV/encoding handling, grouped choices, metadata and dynamic catalog readiness |
 | `survey_options.py` | Static canonical labels/aliases; avoid shared party aliases for candidate choices |
 | `dialogue_segments.py` | Intersect question windows with speaker segments and context |
-| `speaker_roles.py` | Full-sample role inference from question/core speech statistics; distinct from `src/speaker_roles/`. Agent = introduction-dominant speaker; respondent = non-agent speaker with ≥3× the next one's speech; further speakers `unknown` |
+| `speaker_roles.py` | Full-sample role inference from question/core speech statistics; distinct from `src/speaker_roles/`. Agent = introduction-dominant speaker; respondent = non-agent speaker with ≥3× the next one's speech; further speakers `unknown`. If no respondent dominates, status `AGENT_ONLY` keeps the agent and marks all others `unknown` (answers stay with the auditor). `infer_real_speaker_roles.py --agent-speaker <id>` records a listened interviewer label as `human_agent_label` evidence |
 | `speaker_turns.py` | Merge segments, attach roles, mark exportable turns |
 | `speaker_safe_export.py` | Constrain padding against other speakers; retain genuine raw overlap |
 | `prompting_dialogue.py` | Join manifest to ASR results, retaining source/status metadata |

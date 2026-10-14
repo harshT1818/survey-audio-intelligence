@@ -173,7 +173,7 @@ def test_extra_speakers_are_kept_unknown():
     )
 
 
-def test_unresolved_if_no_respondent_dominates_extra_speaker():
+def test_agent_only_if_no_respondent_dominates_extra_speaker():
     questions = [
         make_question("introduction", 10.0, 0.0),
         with_extra_speaker(
@@ -185,8 +185,11 @@ def test_unresolved_if_no_respondent_dominates_extra_speaker():
 
     result = infer_speaker_roles(questions)
 
-    assert result["status"] == "UNRESOLVED"
-    assert result["roles"] == {}
+    assert result["status"] == "AGENT_ONLY"
+    assert result["roles"]["SPEAKER_00"]["role"] == "agent"
+    assert result["roles"]["SPEAKER_01"]["role"] == "unknown"
+    assert result["roles"]["SPEAKER_02"]["role"] == "unknown"
+    assert "respondent" not in {r["role"] for r in result["roles"].values()}
 
 
 def test_unresolved_if_intro_is_ambiguous():
@@ -213,3 +216,29 @@ def test_unresolved_if_intro_is_ambiguous():
         result["status"]
         == "UNRESOLVED"
     )
+
+def test_human_agent_label_replaces_ambiguous_introduction():
+    questions = [
+        make_question("introduction", 5.0, 4.8),
+        make_question("phone_no", 2.0, 9.0),
+        make_question("state_govt_change", 2.0, 6.0),
+    ]
+
+    assert infer_speaker_roles(questions)["status"] == "UNRESOLVED"
+
+    result = infer_speaker_roles(questions, agent_speaker="SPEAKER_00")
+
+    assert result["status"] == "RESOLVED"
+    assert result["roles"]["SPEAKER_00"]["role"] == "agent"
+    assert result["roles"]["SPEAKER_01"]["role"] == "respondent"
+    assert result["evidence"][0]["type"] == "human_agent_label"
+
+
+def test_unknown_agent_label_is_refused():
+    import pytest
+
+    with pytest.raises(ValueError, match="Unknown agent speaker"):
+        infer_speaker_roles(
+            [make_question("introduction", 5.0, 1.0)],
+            agent_speaker="SPEAKER_09",
+        )

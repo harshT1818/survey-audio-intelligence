@@ -70,11 +70,16 @@ def test_spoken_number_matches_small_stored_value():
     assert spoken_numbers("मेरी पचपन साल") == [55]
 
     match = resolve_respondent_answer("मेरी पचपन", [], "55")
-    mismatch = resolve_respondent_answer("छप्पन", [], "55")
 
     assert match.status == "MATCH"
-    assert mismatch.status == "MISMATCH"
-    assert mismatch.resolved_option == "56"
+
+
+def test_spoken_number_never_contradicts_recorded_value():
+    # अट्ठाईस (28) is easily misheard for अड़तीस (38).
+    heard = resolve_respondent_answer("अट्ठाईस साल", [], "38")
+
+    assert heard.status == "UNCERTAIN"
+    assert heard.resolved_option is None
 
 
 def test_numbers_are_never_compared_with_identifiers():

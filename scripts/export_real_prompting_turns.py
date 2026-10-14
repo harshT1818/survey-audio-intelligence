@@ -162,7 +162,7 @@ def main():
         roles_payload.get(
             "status"
         )
-        != "RESOLVED"
+        not in {"RESOLVED", "AGENT_ONLY"}
     ):
         raise ValueError(
             "Speaker roles are not resolved."

@@ -30,6 +30,15 @@ def main():
         required=True,
     )
 
+    parser.add_argument(
+        "--agent-speaker",
+        default=None,
+        help=(
+            "Diarization speaker ID a person confirmed, "
+            "by listening, as the interviewer."
+        ),
+    )
+
     args = parser.parse_args()
 
     sample_dir = (
@@ -50,7 +59,8 @@ def main():
     )
 
     result = infer_speaker_roles(
-        questions
+        questions,
+        agent_speaker=args.agent_speaker,
     )
 
     output_path = (
