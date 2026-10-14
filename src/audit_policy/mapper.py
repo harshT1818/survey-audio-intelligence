@@ -1,5 +1,10 @@
 from dataclasses import dataclass
 
+from src.audit_policy.answer_tree import (
+    MATCH_MISMATCH,
+    PENDING_RULE_REASONS,
+    classify_answer_tree,
+)
 from src.audit_policy.models import (
     AuditTagPolicy,
     DispositionNode,
@@ -14,6 +19,7 @@ class DispositionSuggestion:
     status: str
     review_required: bool
     reason: str
+    comments_required: bool = False
 
 
 def _find_disposition(
@@ -61,6 +67,25 @@ def map_answer_resolution_to_disposition(
             reason="Answer resolution was uncertain.",
         )
 
+    shape = classify_answer_tree(
+        tag_policy.answer_validation.dispositions
+    )
+
+    # "Asked Right"/"Mismatch" only mean answer agreement in a
+    # match/mismatch tree; other trees encode prompting or speech
+    # completeness and need their own rules.
+    if shape != MATCH_MISMATCH:
+        return DispositionSuggestion(
+            disposition_id=None,
+            disposition_text=None,
+            status="NO_MAPPING",
+            review_required=True,
+            reason=PENDING_RULE_REASONS.get(
+                shape,
+                "Answer tree is not a match/mismatch tree.",
+            ),
+        )
+
     target_text = (
         match_disposition_text
         if resolution.status == "MATCH"
@@ -88,9 +113,10 @@ def map_answer_resolution_to_disposition(
         disposition_id=disposition.id,
         disposition_text=disposition.text,
         status="SUGGESTED",
-        review_required=False,
+        review_required=disposition.comments_required,
         reason=(
             f"Answer resolution status was "
             f"{resolution.status}."
         ),
+        comments_required=disposition.comments_required,
     )

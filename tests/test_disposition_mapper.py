@@ -66,7 +66,9 @@ def test_mismatch_maps_to_mismatch():
     assert suggestion.status == "SUGGESTED"
     assert suggestion.disposition_text == "Mismatch"
     assert suggestion.disposition_id is not None
-    assert suggestion.review_required is False
+    # The sample policy requires a comment on Mismatch.
+    assert suggestion.comments_required is True
+    assert suggestion.review_required is True
 
 
 def test_uncertain_requires_human_review():

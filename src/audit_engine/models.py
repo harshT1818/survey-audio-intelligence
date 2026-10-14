@@ -16,6 +16,9 @@ class SuggestedDisposition(BaseModel):
     disposition_path: list[str] = Field(
         default_factory=list
     )
+    # The policy requires an auditor comment for this node, so it
+    # can never be filled automatically.
+    comments_required: bool = False
 
 
 class QuestionAuditResult(BaseModel):
@@ -24,6 +27,8 @@ class QuestionAuditResult(BaseModel):
     evidence: QuestionEvidence
 
     question_validation_status: str | None = None
+    # Asked Right is suggested but must be confirmed (prefill only).
+    question_review_required: bool = False
     question_validation_confidence: float | None = Field(
         default=None,
         ge=0,

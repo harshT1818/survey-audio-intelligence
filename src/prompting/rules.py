@@ -110,7 +110,48 @@ def detect_prompting(
     respondent_text: str,
     agent_followup_text: str,
     options: list[CanonicalOption],
+    evidence_complete: bool = True,
 ) -> PromptingEvidence:
+    """Classify prompting from the respondent's first answer and the
+    agent speech that follows it.
+
+    "No prompting" is a claim about absence, so it is only made when
+    there is a respondent answer and no material dialogue was dropped
+    upstream (evidence_complete); otherwise the result is UNCERTAIN.
+    """
+
+    if not respondent_text.strip():
+        return PromptingEvidence(
+            status="UNCERTAIN",
+            confidence=0.0,
+            agent_followup_text=agent_followup_text,
+            respondent_text=respondent_text,
+            suggested_option=None,
+            review_required=True,
+            reason=(
+                "No respondent answer was available, "
+                "so prompting cannot be assessed."
+            ),
+        )
+
+    if (
+        not agent_followup_text.strip()
+        and not evidence_complete
+    ):
+        return PromptingEvidence(
+            status="UNCERTAIN",
+            confidence=0.0,
+            agent_followup_text=agent_followup_text,
+            respondent_text=respondent_text,
+            suggested_option=None,
+            review_required=True,
+            reason=(
+                "No agent follow-up was found, but material "
+                "turns were dropped upstream (overlap, unknown "
+                "speaker or missing ASR), so the absence of "
+                "prompting cannot be established."
+            ),
+        )
 
     if not agent_followup_text.strip():
         return PromptingEvidence(

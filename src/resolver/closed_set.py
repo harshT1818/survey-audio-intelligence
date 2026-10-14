@@ -77,6 +77,71 @@ def _candidate_texts(
     ]
 
 
+def _collapse_repeats(
+    normalized_text: str,
+) -> str:
+    tokens: list[str] = []
+
+    for token in normalized_text.split():
+        if not tokens or tokens[-1] != token:
+            tokens.append(token)
+
+    return " ".join(tokens)
+
+
+def _covers_whole_answer(
+    normalized_raw: str,
+    option: CanonicalOption,
+    minimum_score: float,
+) -> bool:
+    # WRatio scores an option found anywhere inside a longer
+    # utterance at ~0.9 regardless of what the rest says, e.g.
+    # "नहीं अब बदलाव तो होना चाहिए" -> "नहीं". A whole-answer
+    # match needs the utterance itself to be the option,
+    # allowing for repetition ("नहीं नहीं").
+    raw = _collapse_repeats(
+        normalized_raw
+    )
+
+    return any(
+        fuzz.ratio(
+            raw,
+            _collapse_repeats(
+                _normalize(candidate_text)
+            ),
+        )
+        / 100
+        >= minimum_score
+        for candidate_text in _candidate_texts(
+            option
+        )
+    )
+
+
+def comparison_status(
+    resolved_option: str,
+    stored_option: str | None,
+) -> str:
+    if stored_option is None:
+        return "MATCH"
+
+    if (
+        _normalize(resolved_option)
+        == _normalize(stored_option)
+    ):
+        return "MATCH"
+
+    return "MISMATCH"
+
+
+def is_uncertain_response(
+    raw_text: str,
+) -> bool:
+    return _is_uncertain_response(
+        raw_text
+    )
+
+
 def _is_uncertain_response(
     raw_text: str,
 ) -> bool:
@@ -96,7 +161,14 @@ def resolve_closed_set_answer(
     stored_option: str | None = None,
     minimum_score: float = 0.65,
     ambiguity_margin: float = 0.08,
+    require_whole_answer: bool = False,
 ) -> AnswerResolution:
+    """Resolve text to one canonical option.
+
+    Respondent answers should pass require_whole_answer=True so an
+    option word inside a longer statement stays UNCERTAIN. Agent
+    turns that name an option within a question keep the default.
+    """
 
     if not raw_text.strip() or not options:
         return AnswerResolution(
@@ -194,23 +266,34 @@ def resolve_closed_set_answer(
             candidates=scored[:3],
         )
 
-    if stored_option is None:
-        status = "MATCH"
+    if require_whole_answer:
+        best_option = next(
+            option
+            for option in options
+            if option.value == best.option
+        )
 
-    elif (
-        _normalize(best.option)
-        == _normalize(stored_option)
-    ):
-        status = "MATCH"
-
-    else:
-        status = "MISMATCH"
+        if not _covers_whole_answer(
+            normalized_raw,
+            best_option,
+            minimum_score,
+        ):
+            return AnswerResolution(
+                raw_text=raw_text,
+                stored_option=stored_option,
+                status="UNCERTAIN",
+                confidence=best.score,
+                candidates=scored[:3],
+            )
 
     return AnswerResolution(
         raw_text=raw_text,
         resolved_option=best.option,
         stored_option=stored_option,
-        status=status,
+        status=comparison_status(
+            best.option,
+            stored_option,
+        ),
         confidence=best.score,
         candidates=scored[:3],
     )

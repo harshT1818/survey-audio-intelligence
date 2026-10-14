@@ -82,6 +82,18 @@ def map_question_validation_to_disposition(
             ),
         )
 
+    if validation.review_required:
+        # Asked Right is still the likely disposition, but the evidence
+        # (overlap, options read out, question word not heard) needs a
+        # person to confirm it.
+        return QuestionDispositionSuggestion(
+            disposition_id=disposition.id,
+            disposition_text=disposition.text,
+            status="SUGGESTED",
+            review_required=True,
+            reason=validation.reason,
+        )
+
     return QuestionDispositionSuggestion(
         disposition_id=disposition.id,
         disposition_text=disposition.text,
