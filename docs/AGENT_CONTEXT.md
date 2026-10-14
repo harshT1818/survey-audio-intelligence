@@ -58,6 +58,8 @@ Paths are relative to `src/`. Package `__init__.py` files provide structure.
 | `evidence_quality/corroboration_models.py`, `corroboration.py` | Direct/contextual support, conflicts, unsafe turn IDs and review reasons |
 | `automation/models.py`, `decision.py` | AUTO_FILL/PREFILL/HUMAN_REVIEW proposals and unresolved sides |
 | `evaluation/models.py`, `runner.py` | Synthetic evaluation fixtures, expected-result comparison and summaries |
+| `demo/synthetic.py` | Fictional interview (parties, candidates, turns, windows, policy, human labels) run through the real runner for the demo page |
+| `demo/view_model.py` | Audited interview → demo page data (schema `auditor-assist-demo/1`): script words heard/not heard, turns with flags, per-side suggestions, notes, policy options, waveform |
 
 ### Full-sample source files
 
@@ -103,6 +105,7 @@ some defaults cover only experimental tags and some demo paths are hard-coded.
 | Prompting evaluation | `evaluate_real_prompting.py`, `evaluate_clean_prompting.py`, `diagnose_real_prompting_evidence.py` |
 | Full audit | `evaluate_full_sample_audit.py` (`--sample-dir`, optional `--tags`) |
 | Fixture evaluation | `run_evaluation_fixture.py` (fixture path) |
+| Demo page | `build_demo.py` (`--synthetic` → committed `demo/demo-data.js`; `--sample-dir <dir>` → private `data/private/demo/<dir>.json`) |
 | Manual demos | `test_product_automation_decision.py`, `test_real_ambiguous_prompting.py`, `test_real_chunk_merge.py`, `test_real_corroboration.py`, `test_real_evidence_quality.py`, `test_real_location_mismatch.py`, `test_real_prompting_audio.py`, `test_real_third_speaker.py` |
 
 Demo scripts are separate from automated tests. Dialogue assembly does not perform
@@ -110,6 +113,13 @@ ASR. The clean builder uses fixed clean manifest/results filenames. The merge
 script refuses missing, unexpected or duplicate ASR rows unless
 `--allow-incomplete` is passed, refuses tags already present, and writes
 `<dialogue>.before_merge.json` first (it stops if that backup already exists).
+
+The demo page `demo/index.html` is static (GSAP from cdnjs, Google Fonts) and
+reads `demo/demo-data.js`. Open it directly in a browser. "Open interview" loads
+a private view-model JSON and "Add audio" plays a local file; both stay in the
+browser. Regenerate the committed data after changing the synthetic interview,
+runner decisions or view model: `tests/test_demo.py` fails when it is stale and
+pins the synthetic interview's actions.
 
 ## Data artifacts
 
@@ -130,6 +140,8 @@ script refuses missing, unexpected or duplicate ASR rows unless
 | `full_sample_pending_turn_asr_results.json`, `full_sample_pending_turn_asr_report.json` | Colab Vaani results and coverage/runtime report |
 | `prompting_dialogue_clean.before_merge.json` | Clean dialogue as it was before the merge |
 | `full_sample_audit_diagnosis.md`, `full_sample_pending_export.log` | Private diagnosis and export log |
+| `data/private/demo/<sample>.json` | Demo view model of a real interview (contains transcripts; never commit) |
+| `demo/demo-data.js` | Committed view model of the fictional interview only |
 
 Keep private artifacts ignored. Raw timing exports are not automatically verified
 audio offsets. Do not replace raw ASR with canonical/stored answers. Human labels

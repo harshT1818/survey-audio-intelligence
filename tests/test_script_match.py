@@ -110,7 +110,7 @@ def test_repeating_the_respondents_answer_is_not_naming_an_option():
 
 def test_non_party_options_are_never_names():
     index = build_option_index(OPTIONS)
-    assert options_mentioned(index, "प्रत्याशी का नाम याद है कि नहीं") == set()
+    assert options_mentioned(index, "प्रत्याशी का नाम याद है कि नहीं") == []
 
 
 def test_missing_question_word_and_overlap_are_prefill_only():

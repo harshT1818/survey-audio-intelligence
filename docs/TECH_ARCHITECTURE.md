@@ -124,6 +124,18 @@ back to single suggestion text when no path is provided. Unlabeled, unsupported,
 and no-suggestion cases are distinct from matches/mismatches. Human labels are
 used for comparison after inference, not as answer evidence.
 
+## Demo page
+
+`scripts/build_demo.py` runs the same runner and converts its output with
+`src/demo/view_model.py` into the data behind the static page `demo/index.html`.
+The page adds no decisions of its own: it shows each side's action, suggestion
+and notes, which script words were heard, the transcript with speaker and
+overlap flags, and the policy's dispositions for changing a suggestion. When an
+answer tree has no rule yet (nested prompting, introduction, flat prompting
+while switched off), the answer side says so instead of showing only evidence
+notes. The committed data is a fictional interview; a real interview's view
+model is written under `data/private/demo/` and opened locally.
+
 ## Runtime and limitations
 
 Python 3.12 is the currently used environment. `requirements.txt` is unpinned

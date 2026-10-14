@@ -354,6 +354,7 @@ class OptionIndex:
 
 
 _PARTY_CODE = re.compile(r"^[A-Z][A-Z()+.\- ]{1,15}$")
+_PARTY_MARKER = re.compile(r"\*[A-Z][A-Z()+.\- ]{0,15}\*")
 
 
 def build_option_index(options: list) -> OptionIndex:
@@ -367,7 +368,9 @@ def build_option_index(options: list) -> OptionIndex:
     aliases, names, counts = {}, {}, {}
     for option in options:
         option_aliases = list(getattr(option, "aliases", []) or [])
-        if not any(_PARTY_CODE.match(alias.strip()) for alias in option_aliases):
+        has_code = any(_PARTY_CODE.match(alias.strip()) for alias in option_aliases)
+        # Candidate choices carry their party only inside the label (*BSP*).
+        if not has_code and not _PARTY_MARKER.search(str(option.value)):
             continue
         alias_set = set()
         for alias in option_aliases:
@@ -384,17 +387,18 @@ def build_option_index(options: list) -> OptionIndex:
     return OptionIndex(aliases=aliases, names=names, unique=unique)
 
 
-def options_mentioned(index: OptionIndex, text: str) -> set[str]:
+def options_mentioned(index: OptionIndex, text: str) -> list[str]:
+    """Options named in text, in questionnaire order."""
     spoken = tokens(text)
-    found = set()
+    found = []
     for value, words in index.names.items():
         if any(alias in spoken for alias in index.aliases.get(value, ())):
-            found.add(value)
+            found.append(value)
             continue
         # A full name: two of its words, at least one unique to this option.
         heard = {w for w in words if _token_present(w, spoken)}
         if len(heard) >= 2 and heard & index.unique[value]:
-            found.add(value)
+            found.append(value)
     return found
 
 
@@ -498,7 +502,7 @@ def assess_asking(
     reasons, prefill_only = [], False
     named = []
     if option_index is not None and do_not_read_options:
-        in_script = options_mentioned(option_index, profile.spoken_script)
+        in_script = set(options_mentioned(option_index, profile.spoken_script))
         heard_from_others: set[str] = set()
         window_turns = sorted(
             (t for t in turns if t.get("start_sec") is not None and start <= float(t["start_sec"]) <= end
@@ -506,11 +510,11 @@ def assess_asking(
             key=lambda t: float(t["start_sec"]),
         )
         for turn in window_turns:
-            mentioned = options_mentioned(option_index, turn["transcript"]) - in_script
+            mentioned = [m for m in options_mentioned(option_index, turn["transcript"]) if m not in in_script]
             if turn.get("role") == "agent":
                 named += [m for m in mentioned if m not in heard_from_others and m not in named]
             else:
-                heard_from_others |= mentioned
+                heard_from_others.update(mentioned)
 
     if match.coverage < threshold:
         reasons.append(f"Only {match.coverage:.0%} of the question's content was heard.")
